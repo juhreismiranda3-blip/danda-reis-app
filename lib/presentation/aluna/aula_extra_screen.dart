@@ -41,19 +41,23 @@ class _AulaExtraScreenState extends ConsumerState<AulaExtraScreen> {
     if (_dataEscolhida == null || _periodoEscolhido == null) return;
     setState(() => _enviando = true);
     try {
-      await ref.read(aulaRepositoryProvider).comprarAulaExtra(
+      final aula = await ref.read(aulaRepositoryProvider).comprarAulaExtra(
             alunaId: alunaId,
             data: _dataEscolhida!,
             periodo: _periodoEscolhido!,
           );
-      // TODO: criar o Pagamento vinculado (status pendente) aqui via
-      // PagamentoRepository.cadastrarPagamento, com aulaExtraId apontando
-      // para a aula recém-criada. A aula só fica "de fato" liberada após
-      // a professora dar baixa manual (ver darBaixaManual).
+      // O valor da aula extra é somado à mensalidade pendente da aluna
+      // (não vira uma cobrança avulsa). A aula é confirmada quando a
+      // professora dá baixa na mensalidade.
+      await ref.read(pagamentoRepositoryProvider).incluirAulaExtraNaMensalidade(
+            alunaId: alunaId,
+            valorAula: valorAulaExtra,
+            aulaExtraId: aula.id,
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Aula extra solicitada! Ela é confirmada após o pagamento.'),
+            content: Text('Aula extra reservada! O valor foi somado à sua mensalidade.'),
           ),
         );
         context.pop();
