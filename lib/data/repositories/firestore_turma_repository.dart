@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/turma.dart';
 import '../../domain/repositories/turma_repository.dart';
+import 'ocupacao.dart';
 
 class FirestoreTurmaRepository implements TurmaRepository {
   final FirebaseFirestore _firestore;
@@ -10,7 +11,7 @@ class FirestoreTurmaRepository implements TurmaRepository {
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference get _turmasRef => _firestore.collection('turmas');
-  CollectionReference get _aulasRef => _firestore.collection('aulas');
+  CollectionReference get _ocupacaoRef => _firestore.collection('ocupacao');
 
   @override
   Stream<List<Turma>> get todasTurmas {
@@ -71,7 +72,7 @@ class FirestoreTurmaRepository implements TurmaRepository {
 
       var vagas = 0;
       for (final turma in turmasDoPeriodo) {
-        final ocupadas = await _contarAulasConfirmadas(turma.id, dia);
+        final ocupadas = await _ocupadasNoContador(turma.id, dia);
         vagas += (turma.capacidadeMaxima - ocupadas).clamp(0, turma.capacidadeMaxima);
       }
       resultado[periodo] = vagas;
@@ -87,33 +88,33 @@ class FirestoreTurmaRepository implements TurmaRepository {
     required DateTime dia,
     required Periodo periodo,
   }) async {
-    final diaSemana = _diaSemanaFromWeekday(dia.weekday);
-    if (diaSemana == null) return null;
-
-    final candidatas = await _turmasRef
-        .where('diaSemana', isEqualTo: diaSemana.name)
-        .where('periodo', isEqualTo: periodo.name)
-        .get();
-
-    for (final doc in candidatas.docs) {
-      final turma = _turmaFromDoc(doc);
-      final ocupadas = await _contarAulasConfirmadas(turma.id, dia);
+    final candidatas = await turmasDoDiaEPeriodo(dia, periodo);
+    for (final turma in candidatas) {
+      final ocupadas = await _ocupadasNoContador(turma.id, dia);
       if (ocupadas < turma.capacidadeMaxima) return turma;
     }
     return null; // nenhuma turma com vaga nesse dia+período
   }
 
-  Future<int> _contarAulasConfirmadas(String turmaId, DateTime dia) async {
-    final inicioDia = DateTime(dia.year, dia.month, dia.day);
-    final fimDia = inicioDia.add(const Duration(days: 1));
+  @override
+  Future<List<Turma>> turmasDoDiaEPeriodo(DateTime dia, Periodo periodo) async {
+    final diaSemana = _diaSemanaFromWeekday(dia.weekday);
+    if (diaSemana == null) return const [];
 
-    final snap = await _aulasRef
-        .where('turmaId', isEqualTo: turmaId)
-        .where('data', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDia))
-        .where('data', isLessThan: Timestamp.fromDate(fimDia))
-        .where('status', isEqualTo: 'agendada')
+    final candidatas = await _turmasRef
+        .where('diaSemana', isEqualTo: diaSemana.name)
+        .where('periodo', isEqualTo: periodo.name)
         .get();
-    return snap.docs.length;
+    return candidatas.docs.map(_turmaFromDoc).toList();
+  }
+
+  /// Ocupação atual da turma no dia, lida do contador `ocupacao`
+  /// (fonte única de verdade, mantida pela reserva transacional).
+  Future<int> _ocupadasNoContador(String turmaId, DateTime dia) async {
+    final snap = await _ocupacaoRef.doc(ocupacaoDocId(turmaId, dia)).get();
+    if (!snap.exists) return 0;
+    final data = snap.data() as Map<String, dynamic>;
+    return (data['ocupadas'] as num?)?.toInt() ?? 0;
   }
 
   DiaSemana? _diaSemanaFromWeekday(int weekday) {

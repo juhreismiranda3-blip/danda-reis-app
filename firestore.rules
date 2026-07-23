@@ -44,6 +44,14 @@ service cloud.firestore {
       allow update: if ehProfessora();
     }
 
+    // Contador de ocupação por turma+dia (fonte de verdade da lotação, usado
+    // pela reserva atômica). Leitura liberada para logados (checar vagas);
+    // a escrita acompanha a criação de aulas — em produção, via Cloud Function.
+    match /ocupacao/{ocupacaoId} {
+      allow read: if estaLogado();
+      allow write: if ehProfessora();
+    }
+
     match /pacotes/{pacoteId} {
       allow read: if estaLogado();
       allow write: if ehProfessora();

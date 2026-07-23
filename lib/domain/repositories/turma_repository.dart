@@ -16,8 +16,17 @@ abstract class TurmaRepository {
   /// Encontra automaticamente uma turma com vaga para o dia+período
   /// escolhidos. A aluna nunca escolhe a turma diretamente — isso é
   /// decisão de UX confirmada com a cliente.
+  ///
+  /// Atenção: é uma checagem NÃO atômica, própria para exibição/pré-seleção.
+  /// A reserva de fato (que garante que não haja superlotação) é feita
+  /// transacionalmente em AulaRepository.
   Future<Turma?> encontrarTurmaComVaga({
     required DateTime dia,
     required Periodo periodo,
   });
+
+  /// Lista as turmas candidatas de um dia+período (sem checar vaga).
+  /// Usado pela reserva transacional, que verifica a ocupação de cada
+  /// candidata dentro de uma transação.
+  Future<List<Turma>> turmasDoDiaEPeriodo(DateTime dia, Periodo periodo);
 }
