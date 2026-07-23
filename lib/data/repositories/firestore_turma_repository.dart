@@ -35,7 +35,9 @@ class FirestoreTurmaRepository implements TurmaRepository {
 
   @override
   Future<void> criarTurma(Turma turma) async {
-    await _turmasRef.doc(turma.id).set({
+    // id vazio => deixa o Firestore gerar um id automático.
+    final ref = turma.id.isEmpty ? _turmasRef.doc() : _turmasRef.doc(turma.id);
+    await ref.set({
       'nome': turma.nome,
       'diaSemana': turma.diaSemana.name,
       'periodo': turma.periodo.name,

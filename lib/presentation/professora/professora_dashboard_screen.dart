@@ -22,6 +22,11 @@ class ProfessoraDashboardScreen extends ConsumerWidget {
         title: const Text('Painel'),
         actions: [
           IconButton(
+            onPressed: () => context.push('/professora/cadastros'),
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            tooltip: 'Cadastros',
+          ),
+          IconButton(
             onPressed: () => ref.read(authRepositoryProvider).logout(),
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',

@@ -1,10 +1,75 @@
 import * as admin from "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
+
+/**
+ * Cria a conta de uma aluna (chamado pela professora pelo app).
+ *
+ * Precisa rodar no servidor porque criar a conta de OUTRA pessoa no
+ * Firebase Auth exige privilégios de administrador — não pode ser feito
+ * direto no cliente. Cria o usuário no Auth, grava o perfil em
+ * `usuarios/{uid}` com tipo 'aluna' e gera um link para a aluna definir a
+ * própria senha (que a professora repassa; em produção pode virar e-mail
+ * automático de boas-vindas).
+ */
+export const criarContaAluna = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "É preciso estar logada.");
+  }
+
+  const solicitante = await db.collection("usuarios").doc(request.auth.uid).get();
+  if (solicitante.data()?.tipo !== "professora") {
+    throw new HttpsError(
+      "permission-denied",
+      "Apenas a professora pode cadastrar alunas."
+    );
+  }
+
+  const d = request.data ?? {};
+  const nome = (d.nome ?? "").toString().trim();
+  const email = (d.email ?? "").toString().trim();
+  if (!nome || !email) {
+    throw new HttpsError("invalid-argument", "Nome e e-mail são obrigatórios.");
+  }
+
+  // Senha temporária aleatória — a aluna define a dela pelo link abaixo.
+  const senhaTemporaria = Math.random().toString(36).slice(-10) + "aA1!";
+
+  let userRecord;
+  try {
+    userRecord = await admin.auth().createUser({
+      email,
+      password: senhaTemporaria,
+      displayName: nome,
+    });
+  } catch (e) {
+    throw new HttpsError(
+      "already-exists",
+      "Já existe uma conta com esse e-mail (ou o e-mail é inválido)."
+    );
+  }
+
+  await db.collection("usuarios").doc(userRecord.uid).set({
+    nome,
+    email,
+    telefone: d.telefone ?? null,
+    tipo: "aluna",
+    turmaId: d.turmaId ?? null,
+    diaFixo: d.diaFixo ?? null,
+    periodoFixo: d.periodoFixo ?? null,
+    pacoteAtualId: d.pacoteAtualId ?? null,
+    aulasPorMes: typeof d.aulasPorMes === "number" ? d.aulasPorMes : 4,
+    dataInicio: admin.firestore.Timestamp.now(),
+  });
+
+  const linkDefinirSenha = await admin.auth().generatePasswordResetLink(email);
+  return { uid: userRecord.uid, linkDefinirSenha };
+});
 
 /**
  * Busca o token FCM de uma aluna (armazenado em usuarios/{id}.fcmToken,

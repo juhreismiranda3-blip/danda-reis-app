@@ -10,6 +10,7 @@ import '../presentation/aluna/pagamentos_aluna_screen.dart';
 import '../presentation/aluna/perfil_aluna_screen.dart';
 import '../presentation/aluna/remarcacao_screen.dart';
 import '../presentation/professora/avisos_professora_screen.dart';
+import '../presentation/professora/cadastros_screen.dart';
 import '../presentation/professora/presenca_screen.dart';
 import '../presentation/professora/professora_dashboard_screen.dart';
 import '../presentation/professora/relatorios_screen.dart';
@@ -93,6 +94,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'relatorios',
             builder: (context, state) => const RelatoriosScreen(),
+          ),
+          GoRoute(
+            path: 'cadastros',
+            builder: (context, state) => const CadastrosScreen(),
           ),
         ],
       ),

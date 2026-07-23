@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -12,14 +13,17 @@ class FirebaseAuthRepository implements AuthRepository {
   final fb.FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final GoogleSignIn _googleSignIn;
+  final FirebaseFunctions _functions;
 
   FirebaseAuthRepository({
     fb.FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     GoogleSignIn? googleSignIn,
+    FirebaseFunctions? functions,
   })  : _auth = auth ?? fb.FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn();
+        _googleSignIn = googleSignIn ?? GoogleSignIn(),
+        _functions = functions ?? FirebaseFunctions.instance;
 
   @override
   Stream<Usuario?> get usuarioAtual {
@@ -91,19 +95,36 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> criarContaAluna({
+  Future<NovaContaAluna> criarContaAluna({
     required String nome,
     required String email,
+    String? telefone,
+    String? turmaId,
+    String? diaFixo,
+    String? periodoFixo,
+    int aulasPorMes = 4,
   }) async {
-    // TODO: em produção, isso deve rodar numa Cloud Function com
-    // privilégios de admin (Firebase Admin SDK), para não expor a
-    // criação de contas de terceiros no cliente. Aqui fica o esqueleto
-    // do fluxo esperado:
-    // 1. Function cria o usuário no Firebase Auth com senha temporária.
-    // 2. Function cria o documento em `usuarios` com tipo: 'aluna'.
-    // 3. Function envia e-mail de boas-vindas com link de "definir senha".
-    throw UnimplementedError(
-      'Implementar via Cloud Function callable `criarContaAluna`.',
-    );
+    // Chama a Cloud Function `criarContaAluna`, que roda com privilégios de
+    // admin: cria o usuário no Firebase Auth, grava o perfil em `usuarios`
+    // com tipo 'aluna' e devolve um link para a aluna definir a senha.
+    try {
+      final callable = _functions.httpsCallable('criarContaAluna');
+      final res = await callable.call<Map<String, dynamic>>({
+        'nome': nome,
+        'email': email,
+        'telefone': telefone,
+        'turmaId': turmaId,
+        'diaFixo': diaFixo,
+        'periodoFixo': periodoFixo,
+        'aulasPorMes': aulasPorMes,
+      });
+      final data = res.data;
+      return NovaContaAluna(
+        uid: data['uid'] as String,
+        linkDefinirSenha: data['linkDefinirSenha'] as String?,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception(e.message ?? 'Não foi possível cadastrar a aluna.');
+    }
   }
 }

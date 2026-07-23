@@ -84,6 +84,10 @@ final avisosRecentesProvider = StreamProvider<List<Aviso>>((ref) {
 
 // ---------- Professora ----------
 
+final turmasProvider = StreamProvider<List<Turma>>((ref) {
+  return ref.watch(turmaRepositoryProvider).todasTurmas;
+});
+
 final todasAsAulasDoMesProvider =
     StreamProvider.family<List<Aula>, DateTime>((ref, mes) {
   return ref.watch(aulaRepositoryProvider).todasAsAulas(mesReferencia: mes);
