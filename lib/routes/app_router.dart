@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../presentation/inicio/inicio_screen.dart';
 import '../presentation/auth/login_screen.dart';
+import '../presentation/aluna/agenda_aluna_screen.dart';
 import '../presentation/aluna/aluna_home_screen.dart';
 import '../presentation/aluna/aula_extra_screen.dart';
 import '../presentation/aluna/pagamentos_aluna_screen.dart';
@@ -64,6 +65,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => RemarcacaoScreen(
               aulaId: state.pathParameters['aulaId']!,
             ),
+          ),
+          GoRoute(
+            path: 'agenda',
+            builder: (context, state) => const AgendaAlunaScreen(),
           ),
           GoRoute(
             path: 'aula-extra',
