@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/aula.dart';
-import '../../domain/entities/turma.dart';
+import '../../domain/entities/pagamento.dart';
 import '../../providers/providers.dart';
 import '../shared/widgets/app_card.dart';
 
@@ -22,6 +22,7 @@ class AlunaHomeScreen extends ConsumerWidget {
       aulasDaAlunaProvider((alunaId: usuario.id, mes: mesReferencia)),
     );
     final saldoAsync = ref.watch(saldoPacoteDaAlunaProvider(usuario.id));
+    final pagamentosAsync = ref.watch(pagamentosDaAlunaProvider(usuario.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -39,14 +40,19 @@ class AlunaHomeScreen extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Olá,', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                Text(usuario.nome, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                Text(_saudacao(),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+                Text(usuario.nome.split(' ').first,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
           ],
         ),
         actions: [
           IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
+          const SizedBox(width: 4),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -65,99 +71,92 @@ class AlunaHomeScreen extends ConsumerWidget {
       body: aulasAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(child: Text('Erro ao carregar aulas: $e')),
-        data: (aulas) => _Conteudo(aulas: aulas, saldoAsync: saldoAsync),
+        data: (aulas) => _Conteudo(
+          aulas: aulas,
+          saldoAsync: saldoAsync,
+          pagamentosAsync: pagamentosAsync,
+        ),
       ),
     );
+  }
+
+  String _saudacao() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Bom dia,';
+    if (h < 18) return 'Boa tarde,';
+    return 'Boa noite,';
   }
 
   String _iniciais(String nome) {
     final partes = nome.trim().split(' ');
     if (partes.length == 1) return partes.first.substring(0, 1).toUpperCase();
-    return (partes.first.substring(0, 1) + partes.last.substring(0, 1)).toUpperCase();
+    return (partes.first.substring(0, 1) + partes.last.substring(0, 1))
+        .toUpperCase();
   }
 }
 
 class _Conteudo extends ConsumerWidget {
   final List<Aula> aulas;
   final AsyncValue saldoAsync;
-  const _Conteudo({required this.aulas, required this.saldoAsync});
+  final AsyncValue<List<Pagamento>> pagamentosAsync;
+
+  const _Conteudo({
+    required this.aulas,
+    required this.saldoAsync,
+    required this.pagamentosAsync,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final aulasAtivas = aulas.where((a) => a.status != StatusAula.cancelada).toList();
+    final aulasAtivas =
+        aulas.where((a) => a.status != StatusAula.cancelada).toList();
     final proxima = aulasAtivas
-        .where((a) => a.status == StatusAula.agendada && a.data.isAfter(DateTime.now()))
+        .where((a) =>
+            a.status == StatusAula.agendada && a.data.isAfter(DateTime.now()))
         .toList()
       ..sort((a, b) => a.data.compareTo(b.data));
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
-        if (proxima.isNotEmpty)
-          TintedCard(
-            background: AppColors.pinkLight,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('PRÓXIMA AULA',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.pinkText,
-                        letterSpacing: 0.6)),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat("EEEE 'às' HH:mm", 'pt_BR').format(proxima.first.data),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 2),
-                Text(proxima.first.periodo.label,
-                    style: const TextStyle(fontSize: 13, color: AppColors.pinkText)),
-              ],
-            ),
-          ),
+        // ---- Hero: próxima aula ----
+        _CardProximaAula(proxima: proxima.isEmpty ? null : proxima.first),
         const SizedBox(height: 12),
+        // ---- Indicadores ----
         Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: TintedCard(
+              child: _StatCard(
                 background: AppColors.lilacLight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Aulas restantes',
-                        style: TextStyle(fontSize: 11, color: AppColors.lilacText, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 4),
-                    saldoAsync.when(
-                      data: (saldo) => Text('${saldo.restantes} de ${saldo.totalDoPacote}',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
-                      loading: () => const Text('—', style: TextStyle(fontSize: 20)),
-                      error: (e, st) => const Text('—', style: TextStyle(fontSize: 20)),
-                    ),
-                  ],
+                labelColor: AppColors.lilacText,
+                label: 'Aulas restantes',
+                icone: Icons.event_available_outlined,
+                valor: saldoAsync.when(
+                  data: (saldo) => '${saldo.restantes}',
+                  loading: () => '—',
+                  error: (e, st) => '—',
+                ),
+                complemento: saldoAsync.when(
+                  data: (saldo) => 'de ${saldo.totalDoPacote}',
+                  loading: () => '',
+                  error: (e, st) => '',
                 ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: TintedCard(
-                background: AppColors.lilacLight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Próximo pagamento',
-                        style: TextStyle(fontSize: 11, color: AppColors.lilacText, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 4),
-                    // TODO: substituir por dado real do PagamentoRepository
-                    // (pagamentosDaAlunaProvider, primeiro pendente/atrasado).
-                    const Text('Ver em Pagamentos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              ),
+              child: _CardProximoPagamento(pagamentosAsync: pagamentosAsync),
             ),
           ],
         ),
         const SizedBox(height: 20),
+        Text('Ações rápidas',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -180,6 +179,241 @@ class _Conteudo extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Card de destaque com a próxima aula (ou um estado vazio elegante).
+class _CardProximaAula extends StatelessWidget {
+  final Aula? proxima;
+  const _CardProximaAula({required this.proxima});
+
+  @override
+  Widget build(BuildContext context) {
+    if (proxima == null) {
+      return TintedCard(
+        background: AppColors.pinkLight,
+        child: Row(
+          children: [
+            _IconeCirculo(
+              icone: Icons.event_busy_outlined,
+              cor: AppColors.pinkText,
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Text(
+                'Você não tem aulas agendadas no momento.',
+                style: TextStyle(fontSize: 13.5, color: AppColors.pinkText),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final data = proxima!.data;
+    return TintedCard(
+      background: AppColors.pinkLight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('PRÓXIMA AULA',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.pinkText,
+                      letterSpacing: 0.8)),
+              const Spacer(),
+              _IconeCirculo(
+                icone: Icons.content_cut,
+                cor: AppColors.pinkText,
+                tamanho: 34,
+                tamanhoIcone: 17,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _capitalizar(DateFormat("EEEE", 'pt_BR').format(data)),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${DateFormat("d 'de' MMMM", 'pt_BR').format(data)} · '
+            '${DateFormat("HH:mm").format(data)} · ${proxima!.periodo.label}',
+            style: const TextStyle(fontSize: 13, color: AppColors.pinkText),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _capitalizar(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+/// Card de indicador simples (número em destaque + rótulo).
+class _StatCard extends StatelessWidget {
+  final Color background;
+  final Color labelColor;
+  final String label;
+  final IconData icone;
+  final String valor;
+  final String complemento;
+
+  const _StatCard({
+    required this.background,
+    required this.labelColor,
+    required this.label,
+    required this.icone,
+    required this.valor,
+    required this.complemento,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TintedCard(
+      background: background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icone, size: 16, color: labelColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: labelColor,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(valor,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w600)),
+              if (complemento.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(complemento,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Indicador do próximo pagamento pendente/atrasado (dado real).
+class _CardProximoPagamento extends StatelessWidget {
+  final AsyncValue<List<Pagamento>> pagamentosAsync;
+  const _CardProximoPagamento({required this.pagamentosAsync});
+
+  @override
+  Widget build(BuildContext context) {
+    final moeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
+
+    return TintedCard(
+      background: AppColors.lilacLight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.credit_card_outlined,
+                  size: 16, color: AppColors.lilacText),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text('Próximo pagamento',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.lilacText,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          pagamentosAsync.when(
+            loading: () => const Text('—', style: TextStyle(fontSize: 22)),
+            error: (e, st) => const Text('—', style: TextStyle(fontSize: 22)),
+            data: (lista) {
+              final pendentes = lista
+                  .where((p) => p.status != StatusPagamento.pago)
+                  .toList()
+                ..sort((a, b) => a.vencimento.compareTo(b.vencimento));
+
+              if (pendentes.isEmpty) {
+                return const Text('Em dia',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.successText));
+              }
+
+              final p = pendentes.first;
+              final atrasado = p.status == StatusPagamento.atrasado;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(moeda.format(p.valor),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${atrasado ? 'Venceu' : 'Vence'} '
+                    '${DateFormat("dd/MM").format(p.vencimento)}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: atrasado
+                            ? AppColors.dangerText
+                            : AppColors.textSecondary),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconeCirculo extends StatelessWidget {
+  final IconData icone;
+  final Color cor;
+  final double tamanho;
+  final double tamanhoIcone;
+
+  const _IconeCirculo({
+    required this.icone,
+    required this.cor,
+    this.tamanho = 44,
+    this.tamanhoIcone = 22,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: tamanho,
+      height: tamanho,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icone, size: tamanhoIcone, color: cor),
     );
   }
 }
