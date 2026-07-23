@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    function ehProfessora() {
+      return estaLogado() &&
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tipo == 'professora';
+    }
+
+    function ehDonoDoDocumento(alunaId) {
+      return estaLogado() && request.auth.uid == alunaId;
+    }
+
+    // Cada aluna só lê/edita o próprio perfil; professora lê/edita todos.
+    match /usuarios/{usuarioId} {
+      allow read: if ehDonoDoDocumento(usuarioId) || ehProfessora();
+      allow write: if ehProfessora();
+    }
+
+    // Turmas: leitura liberada para logados (necessário para checar
+    // disponibilidade), escrita só para a professora.
+    match /turmas/{turmaId} {
+      allow read: if estaLogado();
+      allow write: if ehProfessora();
+    }
+
+    // Aulas: aluna só vê as próprias; professora vê todas.
+    // Escrita direta do cliente é restrita — a maior parte das mutações
+    // relevantes (remarcação, presença) deve passar pelas Cloud Functions
+    // para garantir a integridade da máquina de estados.
+    match /aulas/{aulaId} {
+      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
+      allow write: if ehProfessora();
+    }
+
+    match /remarcacoes_pendentes/{solicitacaoId} {
+      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
+      allow create: if estaLogado() && request.resource.data.alunaId == request.auth.uid;
+      allow update: if ehProfessora();
+    }
+
+    match /pacotes/{pacoteId} {
+      allow read: if estaLogado();
+      allow write: if ehProfessora();
+    }
+
+    match /pagamentos/{pagamentoId} {
+      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
+      allow write: if ehProfessora();
+    }
+
+    match /avisos/{avisoId} {
+      allow read: if estaLogado();
+      allow write: if ehProfessora();
+    }
+
+    match /notificacoes/{notificacaoId} {
+      allow read: if estaLogado() && resource.data.alunaId == request.auth.uid;
+      allow write: if false; // só Cloud Functions escrevem aqui
+    }
+  }
+}
