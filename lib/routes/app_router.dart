@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../presentation/inicio/inicio_screen.dart';
 import '../presentation/auth/login_screen.dart';
 import '../presentation/aluna/aluna_home_screen.dart';
 import '../presentation/aluna/aula_extra_screen.dart';
@@ -22,17 +23,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refreshNotifier.dispose);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/inicio',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final usuario = ref.read(usuarioAtualProvider).valueOrNull;
-      final estaLogando = state.matchedLocation == '/login';
+      final loc = state.matchedLocation;
+      final emInicio = loc == '/inicio';
+      final emLogin = loc == '/login';
 
       if (usuario == null) {
-        return estaLogando ? null : '/login';
+        // Não logado: pode ver a tela de início e o login; qualquer outra
+        // rota volta para a tela de início.
+        return (emInicio || emLogin) ? null : '/inicio';
       }
 
-      if (estaLogando) {
+      // Já logado: início e login mandam direto para a área do usuário.
+      if (emInicio || emLogin) {
         return usuario.isProfessora ? '/professora' : '/aluna';
       }
 
@@ -45,6 +51,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/inicio', builder: (context, state) => const InicioScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/aluna',
