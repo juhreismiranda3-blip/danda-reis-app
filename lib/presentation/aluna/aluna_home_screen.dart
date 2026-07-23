@@ -64,7 +64,8 @@ class AlunaHomeScreen extends ConsumerWidget {
         ],
         onDestinationSelected: (i) {
           if (i == 2) context.push('/aluna/pagamentos');
-          // TODO: índices 1 (Agenda) e 3 (Perfil) — telas ainda a criar.
+          if (i == 3) context.push('/aluna/perfil');
+          // TODO: índice 1 (Agenda) — tela ainda a criar.
         },
       ),
       body: aulasAsync.when(

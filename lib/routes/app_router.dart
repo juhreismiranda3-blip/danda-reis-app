@@ -7,6 +7,7 @@ import '../presentation/auth/login_screen.dart';
 import '../presentation/aluna/aluna_home_screen.dart';
 import '../presentation/aluna/aula_extra_screen.dart';
 import '../presentation/aluna/pagamentos_aluna_screen.dart';
+import '../presentation/aluna/perfil_aluna_screen.dart';
 import '../presentation/aluna/remarcacao_screen.dart';
 import '../presentation/professora/avisos_professora_screen.dart';
 import '../presentation/professora/presenca_screen.dart';
@@ -70,6 +71,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'pagamentos',
             builder: (context, state) => const PagamentosAlunaScreen(),
+          ),
+          GoRoute(
+            path: 'perfil',
+            builder: (context, state) => const PerfilAlunaScreen(),
           ),
         ],
       ),
