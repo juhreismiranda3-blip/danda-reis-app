@@ -89,44 +89,20 @@ class _RemarcacaoScreenState extends ConsumerState<RemarcacaoScreen> {
           const SizedBox(height: 10),
           Row(
             children: dias.map((dia) {
-              final selecionado = _mesmoDia(dia, _diaSelecionado);
               return Expanded(
-                child: GestureDetector(
+                child: _DiaChip(
+                  dia: dia,
+                  selecionado: _mesmoDia(dia, _diaSelecionado),
                   onTap: () => setState(() {
                     _diaSelecionado = dia;
                     _periodoSelecionado = null;
                   }),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selecionado ? AppColors.pinkAccent : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          DateFormat('E', 'pt_BR').format(dia),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: selecionado ? Colors.white : AppColors.textMuted,
-                          ),
-                        ),
-                        Text(
-                          '${dia.day}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: selecionado ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               );
             }).toList(),
           ),
+          const SizedBox(height: 10),
+          const _LegendaVaga(),
           const SizedBox(height: 20),
           Text(
             'Períodos disponíveis · ${DateFormat('EEEE', 'pt_BR').format(_diaSelecionado)}',
@@ -178,6 +154,120 @@ class _RemarcacaoScreenState extends ConsumerState<RemarcacaoScreen> {
 
   bool _mesmoDia(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+/// Chip de dia no seletor, com um pontinho que indica se aquele dia tem
+/// alguma vaga (verde), está lotado (vermelho) ou ainda está carregando.
+class _DiaChip extends ConsumerWidget {
+  final DateTime dia;
+  final bool selecionado;
+  final VoidCallback onTap;
+
+  const _DiaChip({
+    required this.dia,
+    required this.selecionado,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final disp = ref.watch(disponibilidadeDoDiaProvider(dia));
+    final bool? temVaga = disp.maybeWhen(
+      data: (lista) => lista.any((d) => d.temVaga),
+      orElse: () => null,
+    );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selecionado ? AppColors.pinkAccent : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selecionado ? AppColors.pinkAccent : AppColors.border,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              DateFormat('E', 'pt_BR').format(dia),
+              style: TextStyle(
+                fontSize: 10,
+                color: selecionado ? Colors.white70 : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${dia.day}',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: selecionado ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _PontoVaga(temVaga: temVaga, selecionado: selecionado),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PontoVaga extends StatelessWidget {
+  final bool? temVaga;
+  final bool selecionado;
+  const _PontoVaga({required this.temVaga, required this.selecionado});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color cor;
+    if (temVaga == null) {
+      cor = selecionado ? Colors.white54 : AppColors.border;
+    } else if (temVaga) {
+      cor = AppColors.successText;
+    } else {
+      cor = AppColors.dangerText;
+    }
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+    );
+  }
+}
+
+/// Legenda dos pontinhos de disponibilidade dos dias.
+class _LegendaVaga extends StatelessWidget {
+  const _LegendaVaga();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _item(AppColors.successText, 'com vaga'),
+        const SizedBox(width: 14),
+        _item(AppColors.dangerText, 'lotado'),
+      ],
+    );
+  }
+
+  Widget _item(Color cor, String texto) {
+    return Row(
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(texto,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+      ],
+    );
+  }
 }
 
 class _PeriodoTile extends StatelessWidget {

@@ -21,7 +21,6 @@ class AlunaHomeScreen extends ConsumerWidget {
     final aulasAsync = ref.watch(
       aulasDaAlunaProvider((alunaId: usuario.id, mes: mesReferencia)),
     );
-    final saldoAsync = ref.watch(saldoPacoteDaAlunaProvider(usuario.id));
     final pagamentosAsync = ref.watch(pagamentosDaAlunaProvider(usuario.id));
 
     return Scaffold(
@@ -73,7 +72,7 @@ class AlunaHomeScreen extends ConsumerWidget {
         error: (e, st) => Center(child: Text('Erro ao carregar aulas: $e')),
         data: (aulas) => _Conteudo(
           aulas: aulas,
-          saldoAsync: saldoAsync,
+          limiteMensal: usuario.aulasPorMes,
           pagamentosAsync: pagamentosAsync,
         ),
       ),
@@ -97,14 +96,24 @@ class AlunaHomeScreen extends ConsumerWidget {
 
 class _Conteudo extends ConsumerWidget {
   final List<Aula> aulas;
-  final AsyncValue saldoAsync;
+  final int limiteMensal;
   final AsyncValue<List<Pagamento>> pagamentosAsync;
 
   const _Conteudo({
     required this.aulas,
-    required this.saldoAsync,
+    required this.limiteMensal,
     required this.pagamentosAsync,
   });
+
+  /// Aulas que "consomem" o limite do mês: exclui as canceladas, as
+  /// remarcadas (que geram uma nova aula já contada) e as aulas extra
+  /// (essas são pagas à parte, não entram no limite do plano).
+  int _aulasUsadasNoMes() => aulas
+      .where((a) =>
+          a.origem != OrigemAula.extra &&
+          a.status != StatusAula.cancelada &&
+          a.status != StatusAula.remarcada)
+      .length;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,9 +125,17 @@ class _Conteudo extends ConsumerWidget {
         .toList()
       ..sort((a, b) => a.data.compareTo(b.data));
 
+    final usadas = _aulasUsadasNoMes();
+    final atingiuLimite = usadas >= limiteMensal;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
+        // ---- Aviso de limite mensal atingido ----
+        if (atingiuLimite) ...[
+          _AvisoLimite(limiteMensal: limiteMensal),
+          const SizedBox(height: 12),
+        ],
         // ---- Hero: próxima aula ----
         _CardProximaAula(proxima: proxima.isEmpty ? null : proxima.first),
         const SizedBox(height: 12),
@@ -130,18 +147,10 @@ class _Conteudo extends ConsumerWidget {
               child: _StatCard(
                 background: AppColors.lilacLight,
                 labelColor: AppColors.lilacText,
-                label: 'Aulas restantes',
+                label: 'Aulas no mês',
                 icone: Icons.event_available_outlined,
-                valor: saldoAsync.when(
-                  data: (saldo) => '${saldo.restantes}',
-                  loading: () => '—',
-                  error: (e, st) => '—',
-                ),
-                complemento: saldoAsync.when(
-                  data: (saldo) => 'de ${saldo.totalDoPacote}',
-                  loading: () => '',
-                  error: (e, st) => '',
-                ),
+                valor: '$usadas',
+                complemento: 'de $limiteMensal',
               ),
             ),
             const SizedBox(width: 10),
@@ -252,6 +261,53 @@ class _CardProximaAula extends StatelessWidget {
 
   String _capitalizar(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+/// Aviso exibido quando a aluna atinge o limite de aulas do mês.
+/// Apenas informa (não bloqueia): as próximas aulas entram como aula extra
+/// e a cobrança fica pendente para a professora.
+class _AvisoLimite extends StatelessWidget {
+  final int limiteMensal;
+  const _AvisoLimite({required this.limiteMensal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warningBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.warningText.withOpacity(0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 20, color: AppColors.warningText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Você já usou suas $limiteMensal aulas deste mês',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.warningText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Novas aulas entram como aula extra (com custo, combinado com a professora).',
+                  style: TextStyle(fontSize: 12, color: AppColors.warningText, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Card de indicador simples (número em destaque + rótulo).

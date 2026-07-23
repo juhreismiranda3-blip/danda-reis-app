@@ -47,6 +47,7 @@ class FirebaseAuthRepository implements AuthRepository {
       turmaId: data['turmaId'] as String?,
       pacoteAtualId: data['pacoteAtualId'] as String?,
       dataInicio: (data['dataInicio'] as Timestamp?)?.toDate(),
+      aulasPorMes: (data['aulasPorMes'] as num?)?.toInt() ?? 4,
     );
   }
 

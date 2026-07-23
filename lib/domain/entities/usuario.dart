@@ -17,6 +17,11 @@ class Usuario {
   final String? pacoteAtualId;
   final DateTime? dataInicio;
 
+  /// Quantas aulas do plano a aluna tem direito por mês. Ao ultrapassar
+  /// esse número no mês, as aulas seguintes são consideradas "aula extra"
+  /// (com custo). Padrão: 4 aulas/mês.
+  final int aulasPorMes;
+
   const Usuario({
     required this.id,
     required this.nome,
@@ -29,6 +34,7 @@ class Usuario {
     this.turmaId,
     this.pacoteAtualId,
     this.dataInicio,
+    this.aulasPorMes = 4,
   });
 
   bool get isProfessora => tipo == TipoUsuario.professora;
