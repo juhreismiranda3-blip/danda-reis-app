@@ -4,6 +4,7 @@ import '../data/repositories/firebase_auth_repository.dart';
 import '../data/repositories/firestore_aula_repository.dart';
 import '../data/repositories/firestore_aviso_repository.dart';
 import '../data/repositories/firestore_pacote_repository.dart';
+import '../data/repositories/firebase_notificacao_repository.dart';
 import '../data/repositories/firestore_pagamento_repository.dart';
 import '../data/repositories/firestore_turma_repository.dart';
 import '../domain/entities/aula.dart';
@@ -16,6 +17,7 @@ import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/aula_repository.dart';
 import '../domain/repositories/aviso_repository.dart';
 import '../domain/repositories/pacote_repository.dart';
+import '../domain/repositories/notificacao_repository.dart';
 import '../domain/repositories/pagamento_repository.dart';
 import '../domain/repositories/turma_repository.dart';
 
@@ -45,6 +47,10 @@ final pagamentoRepositoryProvider = Provider<PagamentoRepository>((ref) {
 
 final avisoRepositoryProvider = Provider<AvisoRepository>((ref) {
   return FirestoreAvisoRepository();
+});
+
+final notificacaoRepositoryProvider = Provider<NotificacaoRepository>((ref) {
+  return FirebaseNotificacaoRepository();
 });
 
 // ---------- Autenticação ----------

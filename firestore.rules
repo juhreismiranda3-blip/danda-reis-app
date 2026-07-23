@@ -16,10 +16,14 @@ service cloud.firestore {
       return estaLogado() && request.auth.uid == alunaId;
     }
 
-    // Cada aluna só lê/edita o próprio perfil; professora lê/edita todos.
+    // Cada aluna só lê o próprio perfil; professora lê/edita todos.
+    // A própria pessoa pode atualizar apenas o seu token de notificação
+    // (fcmToken) — necessário para receber as notificações push.
     match /usuarios/{usuarioId} {
       allow read: if ehDonoDoDocumento(usuarioId) || ehProfessora();
       allow write: if ehProfessora();
+      allow update: if ehDonoDoDocumento(usuarioId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']);
     }
 
     // Turmas: leitura liberada para logados (necessário para checar

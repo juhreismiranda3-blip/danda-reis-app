@@ -25,14 +25,30 @@ construindo junto com o Claude Code.
   - Notificação quando um aviso é criado (para todas as alunas)
   - Lembretes diários (aula amanhã, pagamento vencendo/atrasado)
 
-## O que falta (próximas etapas, em ordem sugerida)
+## Concluído depois da fundação
 
-1. **Perfil e Histórico da aluna** (telas ainda não criadas — os dados já existem nos repositórios)
-2. **Cadastro/edição de turmas e alunas** pelo painel da professora (a lógica já existe em `TurmaRepository` e `criarContaAluna`; falta a tela)
-3. **Persistir o token FCM** no login (`usuarios/{id}.fcmToken`) — necessário para as Cloud Functions de notificação funcionarem
-4. **Criação de conta de aluna via Cloud Function callable** (esqueleto comentado em `firebase_auth_repository.dart`)
-5. **Receita mensal real** nos relatórios (somar pagamentos com `pagoEm` dentro do mês)
-6. Testes automatizados (unitários para os repositórios, widget tests para as telas)
+- **Todas as telas repaginadas** no visual premium (início, login, home da
+  aluna, painel da professora, remarcação, aula extra, pagamentos, avisos,
+  presença, relatórios)
+- **Perfil e Histórico da aluna** (nova tela + aba no menu)
+- **Cadastro de turmas e alunas** pela professora (tela `CadastrosScreen`)
+- **Criação de conta de aluna** via Cloud Function `criarContaAluna` (cria o
+  login no Auth + perfil e devolve link para a aluna definir a senha)
+- **Token FCM** persistido no login (`usuarios/{id}.fcmToken`), com regra do
+  Firestore permitindo a pessoa atualizar só o próprio token
+- **Limite mensal de aulas** com aviso (campo `Usuario.aulasPorMes`)
+- **Aula extra somada à mensalidade** + **recibo** de pagamento na área da aluna
+- **Reserva atômica de vaga** (contador de ocupação por turma+dia) — evita
+  superlotação
+
+## O que ainda falta
+
+1. **Edição/remoção** de turmas e alunas (o cadastro já cria; falta editar)
+2. **Receita mensal real** nos relatórios (somar pagamentos com `pagoEm` no mês)
+3. **Agenda** da aluna (aba do menu ainda sem tela)
+4. Mover as reservas e a cobrança de aula extra para **Cloud Functions** (hoje
+   feitas no cliente; as regras do Firestore preveem isso para produção)
+5. Testes automatizados (unitários para os repositórios, widget tests das telas)
 
 ## Estrutura de pastas atualizada
 
