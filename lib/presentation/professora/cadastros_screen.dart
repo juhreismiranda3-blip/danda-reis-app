@@ -294,7 +294,10 @@ class _TurmasTab extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
               itemCount: turmas.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _TurmaCard(turma: turmas[i]),
+              itemBuilder: (context, i) => _TurmaCard(
+                turma: turmas[i],
+                onTap: () => _abrirFormTurma(context, ref, turma: turmas[i]),
+              ),
             );
           },
         ),
@@ -313,7 +316,7 @@ class _TurmasTab extends ConsumerWidget {
     );
   }
 
-  void _abrirFormTurma(BuildContext context, WidgetRef ref) {
+  void _abrirFormTurma(BuildContext context, WidgetRef ref, {Turma? turma}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -321,84 +324,107 @@ class _TurmasTab extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const _FormTurma(),
+      builder: (_) => _FormTurma(turma: turma),
     );
   }
 }
 
 class _TurmaCard extends StatelessWidget {
   final Turma turma;
-  const _TurmaCard({required this.turma});
+  final VoidCallback onTap;
+  const _TurmaCard({required this.turma, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.lilacLight,
-              shape: BoxShape.circle,
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.lilacLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.groups_outlined,
+                  size: 20, color: AppColors.lilacText),
             ),
-            child: const Icon(Icons.groups_outlined,
-                size: 20, color: AppColors.lilacText),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(turma.nome,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(turma.nome,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${turma.diaSemana.label} · ${turma.periodo.label} · '
+                    '${turma.horarioInicio}–${turma.horarioFim}',
                     style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(
-                  '${turma.diaSemana.label} · ${turma.periodo.label} · '
-                  '${turma.horarioInicio}–${turma.horarioFim}',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              children: [
+                Text('${turma.capacidadeMaxima}',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
+                const Text('vagas',
+                    style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
               ],
             ),
-          ),
-          Column(
-            children: [
-              Text('${turma.capacidadeMaxima}',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-              const Text('vagas',
-                  style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-            ],
-          ),
-        ],
+            const SizedBox(width: 8),
+            const Icon(Icons.edit_outlined,
+                size: 18, color: AppColors.textMuted),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _FormTurma extends ConsumerStatefulWidget {
-  const _FormTurma();
+  final Turma? turma;
+  const _FormTurma({this.turma});
 
   @override
   ConsumerState<_FormTurma> createState() => _FormTurmaState();
 }
 
 class _FormTurmaState extends ConsumerState<_FormTurma> {
-  final _nome = TextEditingController();
-  final _inicio = TextEditingController(text: '09:00');
-  final _fim = TextEditingController(text: '11:00');
-  DiaSemana _dia = DiaSemana.segunda;
-  Periodo _periodo = Periodo.manha;
-  int _capacidade = 6;
+  late final TextEditingController _nome;
+  late final TextEditingController _inicio;
+  late final TextEditingController _fim;
+  late DiaSemana _dia;
+  late Periodo _periodo;
+  late int _capacidade;
   bool _salvando = false;
+
+  bool get _editando => widget.turma != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.turma;
+    _nome = TextEditingController(text: t?.nome ?? '');
+    _inicio = TextEditingController(text: t?.horarioInicio ?? '09:00');
+    _fim = TextEditingController(text: t?.horarioFim ?? '11:00');
+    _dia = t?.diaSemana ?? DiaSemana.segunda;
+    _periodo = t?.periodo ?? Periodo.manha;
+    _capacidade = t?.capacidadeMaxima ?? 6;
+  }
 
   @override
   void dispose() {
@@ -417,19 +443,61 @@ class _FormTurmaState extends ConsumerState<_FormTurma> {
     }
     setState(() => _salvando = true);
     try {
-      await ref.read(turmaRepositoryProvider).criarTurma(Turma(
-            id: '',
-            nome: _nome.text.trim(),
-            diaSemana: _dia,
-            periodo: _periodo,
-            horarioInicio: _inicio.text.trim(),
-            horarioFim: _fim.text.trim(),
-            capacidadeMaxima: _capacidade,
-          ));
+      final turma = Turma(
+        id: widget.turma?.id ?? '',
+        nome: _nome.text.trim(),
+        diaSemana: _dia,
+        periodo: _periodo,
+        horarioInicio: _inicio.text.trim(),
+        horarioFim: _fim.text.trim(),
+        capacidadeMaxima: _capacidade,
+      );
+      final repo = ref.read(turmaRepositoryProvider);
+      if (_editando) {
+        await repo.atualizarTurma(turma);
+      } else {
+        await repo.criarTurma(turma);
+      }
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Turma criada!')),
+          SnackBar(content: Text(_editando ? 'Turma atualizada!' : 'Turma criada!')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  Future<void> _remover() async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Remover turma?'),
+        content: Text(
+            'A turma "${widget.turma!.nome}" será removida. As aulas já '
+            'agendadas não são apagadas.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remover',
+                style: TextStyle(color: AppColors.dangerText)),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true) return;
+    setState(() => _salvando = true);
+    try {
+      await ref.read(turmaRepositoryProvider).removerTurma(widget.turma!.id);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Turma removida.')),
         );
       }
     } finally {
@@ -460,8 +528,9 @@ class _FormTurmaState extends ConsumerState<_FormTurma> {
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
-            const Text('Nova turma',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(_editando ? 'Editar turma' : 'Nova turma',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             TextField(
               controller: _nome,
@@ -541,8 +610,18 @@ class _FormTurmaState extends ConsumerState<_FormTurma> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Criar turma'),
+                  : Text(_editando ? 'Salvar alterações' : 'Criar turma'),
             ),
+            if (_editando) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _salvando ? null : _remover,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Remover turma'),
+                style: TextButton.styleFrom(
+                    foregroundColor: AppColors.dangerText),
+              ),
+            ],
           ],
         ),
       ),

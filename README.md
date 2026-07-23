@@ -43,12 +43,11 @@ construindo junto com o Claude Code.
 
 ## O que ainda falta
 
-1. **Edição/remoção** de turmas e alunas (o cadastro já cria; falta editar)
+1. **Edição/remoção de alunas** (turmas já dá para editar e remover; falta a de alunas)
 2. **Receita mensal real** nos relatórios (somar pagamentos com `pagoEm` no mês)
-3. **Agenda** da aluna (aba do menu ainda sem tela)
-4. Mover as reservas e a cobrança de aula extra para **Cloud Functions** (hoje
+3. Mover as reservas e a cobrança de aula extra para **Cloud Functions** (hoje
    feitas no cliente; as regras do Firestore preveem isso para produção)
-5. Testes automatizados (unitários para os repositórios, widget tests das telas)
+4. Testes automatizados (unitários para os repositórios, widget tests das telas)
 
 ## Estrutura de pastas atualizada
 
