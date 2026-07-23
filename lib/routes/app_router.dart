@@ -10,6 +10,7 @@ import '../presentation/aluna/aula_extra_screen.dart';
 import '../presentation/aluna/pagamentos_aluna_screen.dart';
 import '../presentation/aluna/perfil_aluna_screen.dart';
 import '../presentation/aluna/remarcacao_screen.dart';
+import '../presentation/aluna/vagas_disponiveis_screen.dart';
 import '../presentation/professora/avisos_professora_screen.dart';
 import '../presentation/professora/cadastros_screen.dart';
 import '../presentation/professora/presenca_screen.dart';
@@ -81,6 +82,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'perfil',
             builder: (context, state) => const PerfilAlunaScreen(),
+          ),
+          GoRoute(
+            path: 'vagas',
+            builder: (context, state) => const VagasDisponiveisScreen(),
           ),
         ],
       ),

@@ -88,6 +88,12 @@ final avisosRecentesProvider = StreamProvider<List<Aviso>>((ref) {
   return ref.watch(avisoRepositoryProvider).avisosRecentes;
 });
 
+/// Vagas liberadas (uma aluna recusou) ainda em aberto — a primeira que
+/// aceitar leva. Mostradas para todas as alunas.
+final ofertasAbertasProvider = StreamProvider<List<OfertaVaga>>((ref) {
+  return ref.watch(aulaRepositoryProvider).ofertasAbertas();
+});
+
 // ---------- Professora ----------
 
 final turmasProvider = StreamProvider<List<Turma>>((ref) {

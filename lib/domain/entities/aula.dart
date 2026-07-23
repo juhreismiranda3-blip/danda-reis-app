@@ -12,6 +12,10 @@ enum StatusAula { agendada, concluida, falta, remarcada, cancelada }
 
 enum OrigemAula { pacote, extra, remarcacao }
 
+/// Confirmação de presença que a aluna dá ~1 dia antes da aula.
+/// Se ela recusa, a vaga é liberada e ofertada às demais alunas.
+enum ConfirmacaoAula { pendente, confirmada, recusada }
+
 class Aula {
   final String id;
   final String alunaId;
@@ -20,6 +24,7 @@ class Aula {
   final Periodo periodo;
   final StatusAula status;
   final OrigemAula origem;
+  final ConfirmacaoAula confirmacao;
 
   /// Se esta aula é resultado de uma remarcação, aponta para a aula original.
   final String? aulaOriginalId;
@@ -32,10 +37,11 @@ class Aula {
     required this.periodo,
     required this.status,
     required this.origem,
+    this.confirmacao = ConfirmacaoAula.pendente,
     this.aulaOriginalId,
   });
 
-  Aula copyWith({StatusAula? status}) => Aula(
+  Aula copyWith({StatusAula? status, ConfirmacaoAula? confirmacao}) => Aula(
         id: id,
         alunaId: alunaId,
         turmaId: turmaId,
@@ -43,8 +49,29 @@ class Aula {
         periodo: periodo,
         status: status ?? this.status,
         origem: origem,
+        confirmacao: confirmacao ?? this.confirmacao,
         aulaOriginalId: aulaOriginalId,
       );
+}
+
+/// Uma vaga que foi liberada (a aluna original recusou a aula) e está sendo
+/// ofertada às demais alunas — a primeira que aceitar fica com ela.
+class OfertaVaga {
+  final String id;
+  final String turmaId;
+  final DateTime data;
+  final Periodo periodo;
+  final String origemAlunaId; // quem liberou a vaga
+  final bool aberta;
+
+  const OfertaVaga({
+    required this.id,
+    required this.turmaId,
+    required this.data,
+    required this.periodo,
+    required this.origemAlunaId,
+    required this.aberta,
+  });
 }
 
 /// Uma solicitação de remarcação pendente de aprovação da professora.

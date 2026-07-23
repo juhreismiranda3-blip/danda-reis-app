@@ -25,6 +25,7 @@ class FirestoreAulaRepository implements AulaRepository {
   CollectionReference get _solicitacoesRef =>
       _firestore.collection('remarcacoes_pendentes');
   CollectionReference get _ocupacaoRef => _firestore.collection('ocupacao');
+  CollectionReference get _ofertasRef => _firestore.collection('vagas_ofertadas');
 
   // ---------- Reserva atômica de vaga (anti-superlotação) ----------
 
@@ -78,7 +79,22 @@ class FirestoreAulaRepository implements AulaRepository {
       periodo: Periodo.values.byName(data['periodo'] as String),
       status: StatusAula.values.byName(data['status'] as String),
       origem: OrigemAula.values.byName(data['origem'] as String),
+      confirmacao: data['confirmacao'] != null
+          ? ConfirmacaoAula.values.byName(data['confirmacao'] as String)
+          : ConfirmacaoAula.pendente,
       aulaOriginalId: data['aulaOriginalId'] as String?,
+    );
+  }
+
+  OfertaVaga _ofertaFromDoc(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return OfertaVaga(
+      id: doc.id,
+      turmaId: data['turmaId'] as String,
+      data: (data['data'] as Timestamp).toDate(),
+      periodo: Periodo.values.byName(data['periodo'] as String),
+      origemAlunaId: data['origemAlunaId'] as String,
+      aberta: (data['aberta'] as bool?) ?? false,
     );
   }
 
@@ -334,6 +350,116 @@ class FirestoreAulaRepository implements AulaRepository {
         alunaId: alunaId,
         turmaId: turma.id,
         data: data,
+        periodo: periodo,
+        status: StatusAula.agendada,
+        origem: OrigemAula.extra,
+      );
+    });
+  }
+
+  @override
+  Future<void> confirmarAula(String aulaId) async {
+    await _aulasRef.doc(aulaId).update({
+      'confirmacao': ConfirmacaoAula.confirmada.name,
+    });
+  }
+
+  @override
+  Future<void> recusarAula(String aulaId) async {
+    // Cancela a aula, libera a vaga (decrementa o contador) e cria uma
+    // oferta em `vagas_ofertadas` para as demais alunas — tudo numa
+    // transação, para o contador não sair do lugar.
+    await _firestore.runTransaction((tx) async {
+      final ref = _aulasRef.doc(aulaId);
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() as Map<String, dynamic>;
+      if ((data['status'] as String) != StatusAula.agendada.name) {
+        return; // só recusa aulas ainda agendadas
+      }
+      final turmaId = data['turmaId'] as String;
+      final dataAula = (data['data'] as Timestamp).toDate();
+      final periodo = data['periodo'] as String;
+      final alunaId = data['alunaId'] as String;
+
+      final contSnap =
+          await tx.get(_ocupacaoRef.doc(ocupacaoDocId(turmaId, dataAula)));
+      final ocupadas = _ocupadasDe(contSnap);
+
+      // Escritas
+      tx.update(ref, {
+        'status': StatusAula.cancelada.name,
+        'confirmacao': ConfirmacaoAula.recusada.name,
+      });
+      _gravarOcupacao(tx, turmaId, dataAula, ocupadas - 1);
+      tx.set(_ofertasRef.doc(), {
+        'turmaId': turmaId,
+        'data': Timestamp.fromDate(dataAula),
+        'periodo': periodo,
+        'origemAlunaId': alunaId,
+        'aberta': true,
+        'criadaEm': Timestamp.fromDate(DateTime.now()),
+      });
+    });
+  }
+
+  @override
+  Stream<List<OfertaVaga>> ofertasAbertas() {
+    final hoje = DateTime.now();
+    final inicioHoje = DateTime(hoje.year, hoje.month, hoje.day);
+    return _ofertasRef
+        .where('aberta', isEqualTo: true)
+        .where('data', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioHoje))
+        .orderBy('data')
+        .snapshots()
+        .map((snap) => snap.docs.map(_ofertaFromDoc).toList());
+  }
+
+  @override
+  Future<Aula> aceitarOferta({
+    required String ofertaId,
+    required String alunaId,
+  }) async {
+    return _firestore.runTransaction<Aula>((tx) async {
+      final ofertaRef = _ofertasRef.doc(ofertaId);
+      final ofertaSnap = await tx.get(ofertaRef);
+      if (!ofertaSnap.exists) {
+        throw Exception('Esta vaga não existe mais.');
+      }
+      final oferta = ofertaSnap.data() as Map<String, dynamic>;
+      if ((oferta['aberta'] as bool?) != true) {
+        throw Exception('Esta vaga já foi preenchida.');
+      }
+
+      final turmaId = oferta['turmaId'] as String;
+      final dataAula = (oferta['data'] as Timestamp).toDate();
+      final periodo = Periodo.values.byName(oferta['periodo'] as String);
+
+      final contSnap =
+          await tx.get(_ocupacaoRef.doc(ocupacaoDocId(turmaId, dataAula)));
+      final ocupadas = _ocupadasDe(contSnap);
+
+      // Cria a aula extra para quem aceitou e fecha a oferta. Como só uma
+      // transação consegue marcar `aberta: false` (as demais veem já
+      // fechada), apenas a primeira aluna leva a vaga.
+      final novaAulaRef = _aulasRef.doc();
+      tx.set(novaAulaRef, {
+        'alunaId': alunaId,
+        'turmaId': turmaId,
+        'data': Timestamp.fromDate(dataAula),
+        'periodo': periodo.name,
+        'status': StatusAula.agendada.name,
+        'origem': OrigemAula.extra.name,
+        'aulaOriginalId': null,
+      });
+      _gravarOcupacao(tx, turmaId, dataAula, ocupadas + 1);
+      tx.update(ofertaRef, {'aberta': false, 'preenchidaPor': alunaId});
+
+      return Aula(
+        id: novaAulaRef.id,
+        alunaId: alunaId,
+        turmaId: turmaId,
+        data: dataAula,
         periodo: periodo,
         status: StatusAula.agendada,
         origem: OrigemAula.extra,

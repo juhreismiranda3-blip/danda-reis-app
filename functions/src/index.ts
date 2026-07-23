@@ -177,6 +177,43 @@ export const onAvisoCriado = onDocumentCreated("avisos/{avisoId}", async (event)
 });
 
 /**
+ * Dispara quando uma aluna recusa a aula e libera a vaga (documento novo em
+ * `vagas_ofertadas`). Notifica todas as outras alunas — a primeira que
+ * aceitar leva.
+ */
+export const onVagaOfertada = onDocumentCreated(
+  "vagas_ofertadas/{ofertaId}",
+  async (event) => {
+    const oferta = event.data?.data();
+    if (!oferta || oferta.aberta !== true) return;
+
+    const alunas = await db.collection("usuarios").where("tipo", "==", "aluna").get();
+
+    const tokens = alunas.docs
+      .filter((d) => d.id !== oferta.origemAlunaId)
+      .map((d) => d.data().fcmToken)
+      .filter((t): t is string => !!t);
+
+    if (tokens.length === 0) return;
+
+    const data = (oferta.data as admin.firestore.Timestamp).toDate();
+    const quando = data.toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+    });
+
+    await messaging.sendEachForMulticast({
+      tokens,
+      notification: {
+        title: "Abriu uma vaga!",
+        body: `Vaga em ${quando}. A primeira que aceitar leva — abra o app.`,
+      },
+    });
+  }
+);
+
+/**
  * Roda uma vez por dia. Avisa as alunas que têm aula amanhã e pagamentos
  * vencendo ou atrasados.
  */
@@ -200,8 +237,8 @@ export const lembretesDiarios = onSchedule("every day 08:00", async () => {
     const aula = doc.data();
     await enviarNotificacaoParaAluna(
       aula.alunaId,
-      "Aula amanhã!",
-      "Você tem aula amanhã. Não esqueça de trazer seu material."
+      "Aula amanhã — confirma?",
+      "Você tem aula amanhã. Abra o app para confirmar sua presença (ou liberar a vaga)."
     );
   }
 

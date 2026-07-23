@@ -30,4 +30,24 @@ abstract class AulaRepository {
     required DateTime data,
     required Periodo periodo,
   });
+
+  // ---- Confirmação de presença e oferta de vaga ----
+
+  /// A aluna confirma que vai à aula.
+  Future<void> confirmarAula(String aulaId);
+
+  /// A aluna recusa a aula: ela é cancelada, a vaga é liberada e uma oferta
+  /// é criada para as demais alunas (a primeira que aceitar leva).
+  Future<void> recusarAula(String aulaId);
+
+  /// Ofertas de vaga em aberto (vagas liberadas ainda não preenchidas).
+  Stream<List<OfertaVaga>> ofertasAbertas();
+
+  /// A aluna aceita uma vaga ofertada — vira uma aula extra dela (o valor é
+  /// somado à mensalidade pela camada de apresentação). A primeira a aceitar
+  /// leva; as demais recebem "vaga já preenchida".
+  Future<Aula> aceitarOferta({
+    required String ofertaId,
+    required String alunaId,
+  });
 }

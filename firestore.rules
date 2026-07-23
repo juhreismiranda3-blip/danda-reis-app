@@ -56,6 +56,15 @@ service cloud.firestore {
       allow write: if ehProfessora();
     }
 
+    // Vagas liberadas (aluna recusou) ofertadas às demais. Todas as logadas
+    // veem; quem liberou cria a oferta; aceitar é um update (em produção,
+    // via Cloud Function para garantir 1 vaga = 1 aceite).
+    match /vagas_ofertadas/{ofertaId} {
+      allow read: if estaLogado();
+      allow create: if estaLogado() && request.resource.data.origemAlunaId == request.auth.uid;
+      allow update: if estaLogado();
+    }
+
     match /pacotes/{pacoteId} {
       allow read: if estaLogado();
       allow write: if ehProfessora();
