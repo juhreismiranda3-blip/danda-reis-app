@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/aula.dart';
+import '../../domain/entities/pagamento.dart';
 import '../../providers/providers.dart';
+import '../shared/widgets/app_card.dart';
 
 class ProfessoraDashboardScreen extends ConsumerWidget {
   const ProfessoraDashboardScreen({super.key});
@@ -24,6 +26,7 @@ class ProfessoraDashboardScreen extends ConsumerWidget {
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
           ),
+          const SizedBox(width: 4),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -46,67 +49,83 @@ class ProfessoraDashboardScreen extends ConsumerWidget {
         },
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
-          const Text('Solicitações de remarcação',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
+          // ---- Resumo ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _ResumoCard(
+                  background: AppColors.pinkLight,
+                  labelColor: AppColors.pinkText,
+                  icone: Icons.event_repeat,
+                  label: 'Remarcações',
+                  valor: '${solicitacoesAsync.valueOrNull?.length ?? '—'}',
+                  complemento: 'aguardando',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ResumoCard(
+                  background: AppColors.lilacLight,
+                  labelColor: AppColors.lilacText,
+                  icone: Icons.credit_card_outlined,
+                  label: 'Pagamentos',
+                  valor: '${pagamentosPendentesAsync.valueOrNull?.length ?? '—'}',
+                  complemento: 'pendentes',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          // ---- Solicitações de remarcação ----
+          const _TituloSecao(
+            icone: Icons.event_repeat,
+            titulo: 'Solicitações de remarcação',
+          ),
+          const SizedBox(height: 10),
           solicitacoesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) => Text('Erro: $e'),
+            loading: () => const _CarregandoSecao(),
+            error: (e, st) => _ErroSecao(mensagem: '$e'),
             data: (lista) {
               if (lista.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Nenhuma solicitação pendente.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                return const _VazioSecao(
+                  icone: Icons.check_circle_outline,
+                  mensagem: 'Nenhuma solicitação pendente.',
                 );
               }
               return Column(
-                children: lista.map((s) => _SolicitacaoTile(solicitacao: s)).toList(),
+                children:
+                    lista.map((s) => _SolicitacaoCard(solicitacao: s)).toList(),
               );
             },
           ),
-          const SizedBox(height: 20),
-          const Text('Pagamentos pendentes',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+
+          // ---- Pagamentos pendentes ----
+          const _TituloSecao(
+            icone: Icons.credit_card_outlined,
+            titulo: 'Pagamentos pendentes',
+          ),
+          const SizedBox(height: 10),
           pagamentosPendentesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) => Text('Erro: $e'),
+            loading: () => const _CarregandoSecao(),
+            error: (e, st) => _ErroSecao(mensagem: '$e'),
             data: (lista) {
               if (lista.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Nenhum pagamento pendente.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                return const _VazioSecao(
+                  icone: Icons.check_circle_outline,
+                  mensagem: 'Nenhum pagamento pendente.',
                 );
               }
               return Column(
-                children: lista.map((p) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('R\$ ${p.valor.toStringAsFixed(2)} · ${p.alunaId}',
-                          style: const TextStyle(fontSize: 13)),
-                      TextButton(
-                        onPressed: () => ref.read(pagamentoRepositoryProvider).darBaixaManual(p.id),
-                        child: const Text('Dar baixa'),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                children:
+                    lista.map((p) => _PagamentoCard(pagamento: p)).toList(),
               );
             },
           ),
-          const SizedBox(height: 8),
           // TODO: seções de "Alunas cadastradas" e "Turmas e ocupação"
           // seguem o mesmo padrão de card usado aqui.
         ],
@@ -115,55 +134,270 @@ class ProfessoraDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _SolicitacaoTile extends ConsumerWidget {
-  final SolicitacaoRemarcacao solicitacao;
-  const _SolicitacaoTile({required this.solicitacao});
+class _ResumoCard extends StatelessWidget {
+  final Color background;
+  final Color labelColor;
+  final IconData icone;
+  final String label;
+  final String valor;
+  final String complemento;
+
+  const _ResumoCard({
+    required this.background,
+    required this.labelColor,
+    required this.icone,
+    required this.label,
+    required this.valor,
+    required this.complemento,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    return TintedCard(
+      background: background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icone, size: 16, color: labelColor),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: labelColor,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(valor,
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 5),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(complemento,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TituloSecao extends StatelessWidget {
+  final IconData icone;
+  final String titulo;
+  const _TituloSecao({required this.icone, required this.titulo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icone, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Text(titulo,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary)),
+      ],
+    );
+  }
+}
+
+class _CartaoBase extends StatelessWidget {
+  final Widget child;
+  const _CartaoBase({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
+      child: child,
+    );
+  }
+}
+
+class _SolicitacaoCard extends ConsumerWidget {
+  final SolicitacaoRemarcacao solicitacao;
+  const _SolicitacaoCard({required this.solicitacao});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _CartaoBase(
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // TODO: substituir pelo nome real (buscar Usuario por alunaId).
-                Text(solicitacao.alunaId, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
+                Text(solicitacao.alunaId,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
                 Text(
-                  '${DateFormat("EEEE", 'pt_BR').format(solicitacao.novaData)} · ${solicitacao.novoPeriodo.label}',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                  '${_capitalizar(DateFormat("EEEE", 'pt_BR').format(solicitacao.novaData))} · '
+                  '${DateFormat("dd/MM").format(solicitacao.novaData)} · '
+                  '${solicitacao.novoPeriodo.label}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
           ),
-          Row(
-            children: [
-              _AcaoIcone(
-                icone: Icons.check,
-                corFundo: AppColors.successBg,
-                corIcone: AppColors.successText,
-                onTap: () => ref.read(aulaRepositoryProvider).aprovarRemarcacao(solicitacao.id),
-              ),
-              const SizedBox(width: 6),
-              _AcaoIcone(
-                icone: Icons.close,
-                corFundo: AppColors.dangerBg,
-                corIcone: AppColors.dangerText,
-                onTap: () => ref.read(aulaRepositoryProvider).recusarRemarcacao(solicitacao.id),
-              ),
-            ],
+          const SizedBox(width: 8),
+          _AcaoIcone(
+            icone: Icons.check,
+            corFundo: AppColors.successBg,
+            corIcone: AppColors.successText,
+            onTap: () => ref
+                .read(aulaRepositoryProvider)
+                .aprovarRemarcacao(solicitacao.id),
+          ),
+          const SizedBox(width: 8),
+          _AcaoIcone(
+            icone: Icons.close,
+            corFundo: AppColors.dangerBg,
+            corIcone: AppColors.dangerText,
+            onTap: () => ref
+                .read(aulaRepositoryProvider)
+                .recusarRemarcacao(solicitacao.id),
           ),
         ],
       ),
+    );
+  }
+
+  String _capitalizar(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+class _PagamentoCard extends ConsumerWidget {
+  final Pagamento pagamento;
+  const _PagamentoCard({required this.pagamento});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final moeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$ ');
+    final atrasado = pagamento.status == StatusPagamento.atrasado;
+
+    return _CartaoBase(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(moeda.format(pagamento.valor),
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    atrasado
+                        ? StatusPill.perigo('Atrasado')
+                        : StatusPill.aviso('Pendente'),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  // TODO: substituir pelo nome real (buscar Usuario por alunaId).
+                  '${pagamento.alunaId} · vence '
+                  '${DateFormat("dd/MM").format(pagamento.vencimento)}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => ref
+                .read(pagamentoRepositoryProvider)
+                .darBaixaManual(pagamento.id),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.successText,
+              backgroundColor: AppColors.successBg,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Dar baixa',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VazioSecao extends StatelessWidget {
+  final IconData icone;
+  final String mensagem;
+  const _VazioSecao({required this.icone, required this.mensagem});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Icon(icone, size: 26, color: AppColors.textMuted),
+          const SizedBox(height: 8),
+          Text(mensagem,
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CarregandoSecao extends StatelessWidget {
+  const _CarregandoSecao();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _ErroSecao extends StatelessWidget {
+  final String mensagem;
+  const _ErroSecao({required this.mensagem});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text('Erro: $mensagem',
+          style: const TextStyle(color: AppColors.dangerText, fontSize: 13)),
     );
   }
 }
@@ -186,10 +420,10 @@ class _AcaoIcone extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 30,
-        height: 30,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(color: corFundo, shape: BoxShape.circle),
-        child: Icon(icone, size: 15, color: corIcone),
+        child: Icon(icone, size: 19, color: corIcone),
       ),
     );
   }
