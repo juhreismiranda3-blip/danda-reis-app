@@ -6,7 +6,12 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  /// Perfil escolhido na tela de início ('aluna' ou 'professora'), usado só
+  /// para personalizar o texto — o acesso em si é o mesmo (a conta define o
+  /// tipo de usuário).
+  final String? perfil;
+
+  const LoginScreen({super.key, this.perfil});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -157,7 +162,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 style: textTheme.titleMedium),
                             const SizedBox(height: 2),
                             Text(
-                              'Entre para ver suas aulas e pagamentos.',
+                              widget.perfil == 'professora'
+                                  ? 'Acesse o painel da professora.'
+                                  : widget.perfil == 'aluna'
+                                      ? 'Entre para ver suas aulas e pagamentos.'
+                                      : 'Entre para continuar.',
                               style: textTheme.bodySmall?.copyWith(
                                 color: AppColors.textSecondary,
                               ),

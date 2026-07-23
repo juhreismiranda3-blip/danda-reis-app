@@ -113,18 +113,27 @@ class _InicioScreenState extends State<InicioScreen>
                     child: const _CartaoDestaques(),
                   ),
                   const Spacer(flex: 2),
-                  // Botão principal
+                  // Botões de entrada (aluna / professora)
                   _Surge(
                     animacao: _intervalo(0.5, 1.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         ElevatedButton(
-                          onPressed: () => context.go('/login'),
+                          onPressed: () => context.go('/login?perfil=aluna'),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
-                          child: const Text('Entrar'),
+                          child: const Text('Entrar como aluna'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton(
+                          onPressed: () =>
+                              context.go('/login?perfil=professora'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('Entrar como professora'),
                         ),
                         const SizedBox(height: 14),
                         Text(

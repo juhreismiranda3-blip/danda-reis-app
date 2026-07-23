@@ -56,7 +56,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/inicio', builder: (context, state) => const InicioScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) =>
+            LoginScreen(perfil: state.uri.queryParameters['perfil']),
+      ),
       GoRoute(
         path: '/aluna',
         builder: (context, state) => const AlunaHomeScreen(),
