@@ -175,18 +175,15 @@ function gerarAulas(a){const t=S.turmas.find(x=>x.id===a.turmaId);if(!t)return;f
 function diaVenc(){return (S&&S.config&&S.config.diaVencimento)||10;}
 function novaMensalidade(alunaId,base){const now=new Date();const d=diaVenc();let venc=new Date(now.getFullYear(),now.getMonth(),d);if(venc<now)venc=new Date(now.getFullYear(),now.getMonth()+1,d);return {id:uid(),alunaId,base:base,extras:0,qtdExtras:0,venc:venc.toISOString(),pagoEm:null,desc:'Mensalidade de '+mesNome(venc)};}
 
+var DIAS_SEMANA=['segunda','terca','quarta','quinta'];
+var PERIODOS=['manha','tarde','noite'];
+var HORARIOS={manha:['09:00','11:00'],tarde:['14:00','16:00'],noite:['19:00','21:00']};
+function turmasPadrao(){var out=[];DIAS_SEMANA.forEach(function(d){PERIODOS.forEach(function(p){out.push({id:'t_'+d+'_'+p,nome:DIA_LABEL[d]+' '+PER_LABEL[p],dia:d,periodo:p,inicio:HORARIOS[p][0],fim:HORARIOS[p][1],cap:6});});});return out;}
 function seed(){
-  const turmas=[
-    {id:'t1',nome:'Segunda Manhã',dia:'segunda',periodo:'manha',inicio:'09:00',fim:'11:00',cap:6},
-    {id:'t2',nome:'Segunda Tarde',dia:'segunda',periodo:'tarde',inicio:'14:00',fim:'16:00',cap:6},
-    {id:'t3',nome:'Terça Tarde',dia:'terca',periodo:'tarde',inicio:'14:00',fim:'16:00',cap:6},
-    {id:'t4',nome:'Quarta Manhã',dia:'quarta',periodo:'manha',inicio:'09:00',fim:'11:00',cap:6},
-    {id:'t5',nome:'Quinta Manhã',dia:'quinta',periodo:'manha',inicio:'09:00',fim:'11:00',cap:6},
-    {id:'t6',nome:'Quinta Tarde',dia:'quinta',periodo:'tarde',inicio:'14:00',fim:'16:00',cap:6},
-  ];
-  S={turmas,alunas:[],aulas:[],pagamentos:[],avisos:[],ofertas:[],config:{diaVencimento:10,professoraEmail:'',mensalidade:180,valorExtra:40}};
+  S={turmas:turmasPadrao(),alunas:[],aulas:[],pagamentos:[],avisos:[],ofertas:[],config:{diaVencimento:10,professoraEmail:'',mensalidade:180,valorExtra:40}};
   return S;
 }
+function gerarTurmasPadrao(){var add=0;turmasPadrao().forEach(function(t){var existe=S.turmas.some(function(x){return x.dia===t.dia&&x.periodo===t.periodo;});if(!existe){t.id=uid();S.turmas.push(t);add++;}});if(add>0){save();render();toast(add+' turma'+(add>1?'s':'')+' criada'+(add>1?'s':'')+' 💗');}else{toast('Todas as turmas padrão já existem.');}}
 function setDiaVenc(delta){var d=(diaVenc()+delta);if(d<1)d=1;if(d>28)d=28;S.config.diaVencimento=d;S.pagamentos.forEach(function(p){if(!p.pagoEm){var v=D(p.venc);p.venc=new Date(v.getFullYear(),v.getMonth(),d).toISOString();}});save();render();toast('Vencimento de todas: dia '+d);}
 function save(){if(!db){return;}db.collection('app').doc('estado').set(S).catch(function(e){toast('Falha ao salvar — verifique a internet.');});}
 
@@ -299,7 +296,7 @@ function statMini(l,v,bg){return '<div class="d-stat" style="background:var(--'+
 function big(e,t,s,act){return '<div class="d-big" onclick="'+act+'"><div class="d-ic">'+e+'</div><div class="d-grow"><div class="d-b">'+t+'</div><div class="d-s">'+s+'</div></div><div style="color:var(--muted)">›</div></div>';}
 
 function scrTurmas(){
-  return '<button class="d-cta" onclick="newTurma()">+ Nova turma</button>'+
+  return '<button class="d-cta" onclick="newTurma()">+ Nova turma</button>'+'<button class="d-cta ghost" onclick="gerarTurmasPadrao()">Gerar turmas padrão (seg–qui · manhã/tarde/noite)</button>'+
    (S.turmas.length?S.turmas.map(t=>'<div class="d-card d-row" onclick="edTurma(\''+t.id+'\')"><div class="d-ic">👥</div><div class="d-grow"><div class="d-b">'+esc(t.nome)+'</div><div class="d-s">'+DIA_LABEL[t.dia]+' · '+PER_LABEL[t.periodo]+' · '+t.inicio+'–'+t.fim+'</div></div><div class="d-cap"><b>'+t.cap+'</b><span>vagas</span></div></div>').join(''):empty('Nenhuma turma ainda.'));
 }
 function scrTurmaForm(){
