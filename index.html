@@ -330,9 +330,15 @@ function scrAlunaForm(){
    (a?'<button class="d-cta ghost danger" onclick="delAluna(\''+a.id+'\')">Remover aluna</button>':'');
 }
 function scrPresenca(){
-  const list=S.aulas.filter(a=>a.status==='agendada').sort((x,y)=>D(x.data)-D(y.data)).slice(0,12);
+  var list=S.aulas.filter(function(a){return a.status==='agendada';}).sort(function(x,y){return (D(x.data)-D(y.data))||(PERIODOS.indexOf(x.periodo)-PERIODOS.indexOf(y.periodo));}).slice(0,150);
   if(!list.length)return empty('Nenhuma aula agendada para marcar.');
-  return list.map(a=>'<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+dow(a.data)+' '+dm(a.data)+' · '+PER_LABEL[a.periodo]+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div></div>').join('');
+  var out='';var lastKey='';
+  list.forEach(function(a){
+    var key=dm(a.data)+'|'+a.periodo;
+    if(key!==lastKey){out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px">'+cap(dow(a.data))+' '+dm(a.data)+' · '+PER_LABEL[a.periodo]+'</div>';lastKey=key;}
+    out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+esc(turmaLabel(a.turmaId))+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div></div>';
+  });
+  return out;
 }
 function scrAvisos(){
   return '<div class="d-card"><input id="av_t" class="d-input" placeholder="Título"><textarea id="av_m" class="d-input" rows="3" placeholder="Mensagem"></textarea><button class="d-cta" onclick="enviarAviso()">Enviar para todas</button></div>'+
