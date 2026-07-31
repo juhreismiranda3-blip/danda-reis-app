@@ -226,11 +226,16 @@ function saveTurma(){const nome=val('f_nome');if(!nome.trim()){toast('Dê um nom
  if(V.param){const i=S.turmas.findIndex(t=>t.id===V.param);S.turmas[i]=obj;}else{S.turmas.push(obj);}
  save();go('p_turmas');toast(V.param?'Turma atualizada':'Turma criada');}
 function delTurma(id){ask('Remover esta turma?',function(){S.turmas=S.turmas.filter(t=>t.id!==id);save();go('p_turmas');toast('Turma removida');});}
-function saveAluna(){const nome=val('f_nome');if(!nome.trim()){toast('Preencha o nome');return;}
- const turmaId=val('f_turma');const aulasMes=parseInt(val('f_aulas'))||4;const repo=parseInt(val('f_repo'))||0;
- if(V.param){const a=S.alunas.find(x=>x.id===V.param);a.nome=nome.trim();a.email=val('f_email');a.tel=val('f_tel');a.turmaId=turmaId;a.aulasMes=aulasMes;a.reposicao=repo;}
- else{const a={id:uid(),nome:nome.trim(),email:val('f_email'),tel:val('f_tel'),turmaId,aulasMes,reposicao:repo};S.alunas.push(a);gerarAulas(a);S.pagamentos.push(novaMensalidade(a.id,180));}
- save();go('p_alunas');toast(V.param?'Aluna atualizada':'Aluna cadastrada — link enviado!');}
+function saveAluna(){var nome=val('f_nome');if(!nome.trim()){toast('Preencha o nome');return;}
+ var email=val('f_email').trim();var senha=val('f_senha');var turmaId=val('f_turma');var aulasMes=parseInt(val('f_aulas'))||4;var repo=parseInt(val('f_repo'))||0;
+ if(V.param){var a=S.alunas.find(function(x){return x.id===V.param;});a.nome=nome.trim();a.email=email;a.tel=val('f_tel');a.turmaId=turmaId;a.aulasMes=aulasMes;a.reposicao=repo;}
+ else{var a={id:uid(),nome:nome.trim(),email:email,tel:val('f_tel'),turmaId:turmaId,aulasMes:aulasMes,reposicao:repo};S.alunas.push(a);gerarAulas(a);S.pagamentos.push(novaMensalidade(a.id,180));}
+ save();
+ if(senha){if(senha.length<6){go('p_alunas');toast('Aluna salva. A senha precisa de 6+ caracteres.');return;}if(!email){go('p_alunas');toast('Aluna salva. Preencha o e-mail pra criar o acesso.');return;}criarAcessoAluna(email,senha);return;}
+ go('p_alunas');toast(V.param?'Aluna atualizada 💗':'Aluna cadastrada 💗');}
+function criarAcessoAluna(email,senha){
+ var sec;try{sec=firebase.app('secondary');}catch(e){sec=firebase.initializeApp(FIREBASE_CONFIG,'secondary');}
+ sec.auth().createUserWithEmailAndPassword(email,senha).then(function(){return sec.auth().signOut();}).then(function(){go('p_alunas');toast('Aluna cadastrada e acesso criado! 💗');}).catch(function(err){var c=(err&&err.code)||'';if(c.indexOf('email-already-in-use')>=0){go('p_alunas');toast('Aluna salva. Ela já tinha acesso — a senha dela continua a mesma.');}else{go('p_alunas');toast('Aluna salva, mas o acesso não: '+msgErr(err));}});}
 function delAluna(id){ask('Remover esta aluna?',function(){S.alunas=S.alunas.filter(a=>a.id!==id);save();go('p_alunas');toast('Aluna removida');});}
 function marcar(id,st){const a=S.aulas.find(x=>x.id===id);if(!a)return;a.status=st;save();render();toast(st==='concluida'?'Presença registrada ✓':'Falta registrada');}
 function agendarReposicao(){const a=curAluna();if((a.reposicao||0)<=0){toast('Você não tem reposição disponível');return;}if(!V.tmp.dia||!V.tmp.periodo){toast('Escolha data e período');return;}const t=turmaComVaga(V.tmp.dia,V.tmp.periodo);if(!t){toast('Sem vagas nesse período');return;}S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:V.tmp.dia,periodo:V.tmp.periodo,hora:t.inicio,status:'agendada',confirmacao:'confirmada',origem:'reposicao'});a.reposicao-=1;save();go('a_home');toast('Reposição agendada! Sem custo 💚');}
@@ -311,7 +316,9 @@ function scrAlunaForm(){
   const a=V.param?S.alunas.find(x=>x.id===V.param):null;
   return '<div class="d-s">Cria o acesso da aluna e o perfil dela.</div>'+
    '<input id="f_nome" class="d-input" placeholder="Nome completo" value="'+(a?esc(a.nome):'')+'">'+
-   '<input id="f_email" class="d-input" placeholder="E-mail" value="'+(a?esc(a.email):'')+'">'+
+   '<input id="f_email" class="d-input" type="email" placeholder="E-mail da aluna" value="'+(a?esc(a.email):'')+'">'+
+   '<div class="d-s" style="margin-top:2px">Senha de acesso da aluna'+(a?' (deixe em branco pra manter a atual)':' — anote e passe pra ela')+'</div>'+
+   '<input id="f_senha" class="d-input" type="text" autocomplete="off" placeholder="Senha (mínimo 6 caracteres)" value="">'+
    '<input id="f_tel" class="d-input" placeholder="Telefone (opcional)" value="'+(a?esc(a.tel):'')+'">'+
    '<select id="f_turma" class="d-input">'+turmaOpts(a?a.turmaId:'')+'</select>'+
    '<input id="f_aulas" class="d-input" type="number" placeholder="Aulas por mês" value="'+(a?a.aulasMes:4)+'">'+
@@ -541,7 +548,7 @@ function scrLogin(){
         '<button class="d-cta" id="loginBtn" onclick="'+(su?'criarConta()':'fazerLogin()')+'">'+(su?'Criar acesso':'Entrar')+'</button>'+
         '<button class="d-linkbtn" style="font-size:12.5px" onclick="toggleSignup()">'+(su?'Já tenho conta — Entrar':'Primeira vez? Criar acesso')+'</button>'+
       '</div>'+
-      '<div class="w-help">'+(prof?'Sua senha é sua — ninguém mais vê.':'Use o mesmo e-mail que a professora cadastrou.')+'</div>'+
+      '<div class="w-help">'+(prof?'Sua senha é sua — ninguém mais vê.':'Entre com o e-mail e a senha que a professora te passou.')+'</div>'+
     '</div>'+
   '</div>';
 }
