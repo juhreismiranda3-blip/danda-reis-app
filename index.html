@@ -335,14 +335,20 @@ function scrAlunaForm(){
    (a?'<button class="d-cta ghost danger" onclick="delAluna(\''+a.id+'\')">Remover aluna</button>':'');
 }
 function scrPresenca(){
-  var list=S.aulas.filter(function(a){return a.status==='agendada';}).sort(function(x,y){return (D(x.data)-D(y.data))||(PERIODOS.indexOf(x.periodo)-PERIODOS.indexOf(y.periodo));}).slice(0,150);
-  if(!list.length)return empty('Nenhuma aula agendada para marcar.');
-  var out='';var lastKey='';
-  list.forEach(function(a){
-    var key=dm(a.data)+'|'+a.periodo;
-    if(key!==lastKey){out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px">'+cap(dow(a.data))+' '+dm(a.data)+' · '+PER_LABEL[a.periodo]+'</div>';lastKey=key;}
-    out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+esc(turmaLabel(a.turmaId))+(a.origem==='reposicao'?' · Reposição':a.origem==='extra'?' · Extra':'')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';
-  });
+  var ts=S.turmas.slice().sort(function(a,b){return (DIAS_SEMANA.indexOf(a.dia)-DIAS_SEMANA.indexOf(b.dia))||(PERIODOS.indexOf(a.periodo)-PERIODOS.indexOf(b.periodo));});
+  if(!ts.length)return empty('Crie as turmas primeiro.');
+  return '<div class="d-s">Toque numa turma para marcar a presença.</div>'+ts.map(function(t){
+    var n=S.alunas.filter(function(a){return a.turmaId===t.id;}).length;var vg=Math.max(0,t.cap-n);
+    return '<div class="d-card d-row" onclick="V.param=\''+t.id+'\';go(\'p_presenca_turma\')"><div class="d-ic">📅</div><div class="d-grow"><div class="d-b">'+esc(t.nome)+'</div><div class="d-s">'+t.inicio+'–'+t.fim+' · '+n+' aluna'+(n!==1?'s':'')+'</div></div><span class="pill '+(vg>0?'ok':'dang')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'lotada')+'</span></div>';
+  }).join('');
+}
+function scrPresencaTurma(){
+  var t=S.turmas.find(function(x){return x.id===V.param;});if(!t)return empty('Turma não encontrada.');
+  var ag=S.aulas.filter(function(a){return a.turmaId===t.id&&a.status==='agendada';}).sort(function(x,y){return D(x.data)-D(y.data);});
+  var out='<div class="d-tint"><div class="d-eyebrow">'+esc(t.nome)+'</div><div class="d-s" style="color:var(--pinkT);margin-top:4px">'+t.inicio+'–'+t.fim+' · capacidade '+t.cap+'</div></div>';
+  if(!ag.length){out+=empty('Nenhuma aula agendada nesta turma.');}else{var lastD='';ag.forEach(function(a){var dk=dm(a.data);if(dk!==lastD){var vg=Math.max(0,t.cap-ocupadas(t.id,a.data));out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span>'+cap(dow(a.data))+' '+dm(a.data)+'</span><span class="pill '+(vg>0?'ok':'dang')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'lotada')+'</span></div>';lastD=dk;}out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+(a.origem==='reposicao'?'Reposição':a.origem==='extra'?'Aula extra':'Aula fixa')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';});}
+  var hist=S.aulas.filter(function(a){return a.turmaId===t.id&&(a.status==='cancelada'||a.status==='falta'||a.status==='concluida');}).sort(function(x,y){return D(y.data)-D(x.data);}).slice(0,25);
+  if(hist.length){out+='<div class="d-section" style="margin-top:18px">Histórico</div>';hist.forEach(function(a){var tag=a.status==='cancelada'?'<span class="pill warn">Desmarcou</span>':a.status==='falta'?'<span class="pill dang">Faltou</span>':'<span class="pill ok">Presente</span>';out+='<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13.5px">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+cap(dow(a.data))+' '+dm(a.data)+'</div></div>'+tag+'</div>';});}
   return out;
 }
 function scrAvisos(){
@@ -578,6 +584,7 @@ const SCREENS={
   p_aluna_form:{t:function(){return V.param?'Editar aluna':'Nova aluna';},back:'p_alunas',f:scrAlunaForm},
   p_pagamentos:{t:'Pagamentos',nav:'prof',f:scrProfPagamentos},
   p_presenca:{t:'Presença',nav:'prof',f:scrPresenca},
+  p_presenca_turma:{t:function(){var t=S.turmas.find(function(x){return x.id===V.param;});return t?t.nome:'Presença';},back:'p_presenca',f:scrPresencaTurma},
   p_avisos:{t:'Avisos',nav:'prof',f:scrAvisos},
   p_relatorios:{t:'Relatórios',nav:'prof',f:scrRelatorios},
   a_home:{t:function(){return 'Olá, '+curAluna().nome.split(' ')[0]+' 👋';},nav:'aluna',f:scrAlunaHome},
