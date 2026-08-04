@@ -1,5 +1,3 @@
 {
-  "projects": {
-    "default": "COLOQUE_AQUI_O_ID_DO_SEU_PROJETO_FIREBASE"
-  }
+  "projects": { "default": "danda-reis" }
 }

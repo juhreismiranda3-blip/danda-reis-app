@@ -1,0 +1,27 @@
+name: Publicar central de notificações
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar dependências
+        working-directory: functions
+        run: npm install
+      - name: Publicar no Firebase
+        uses: w9jds/firebase-action@v13.20.2
+        with:
+          args: deploy --only functions --project danda-reis
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
