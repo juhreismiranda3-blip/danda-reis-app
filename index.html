@@ -137,7 +137,7 @@ textarea.d-input{resize:vertical;}
 .pc-body{font-size:13px;color:#4a3d46;margin-top:2px;line-height:1.35;}
 #toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(16px);background:#3E2E3A;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;font-weight:500;opacity:0;transition:.25s;z-index:60;pointer-events:none;max-width:82vw;text-align:center;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-.w-logo img,.rc-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}</style>
+.w-logo img,.rc-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}.vercomo{background:#8C5A82;color:#fff;font-size:12px;text-align:center;padding:9px 10px;cursor:pointer;}</style>
 </head>
 <body>
 <div id="app"></div>
@@ -204,9 +204,9 @@ function usarCreditoOuCobrar(al){if((al.reposicao||0)>0){al.reposicao-=1;return 
 function sameDay(a,b){const x=D(a),y=D(b);return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate();}
 function turmasDe(weekday,periodo){return S.turmas.filter(t=>DOW[t.dia]===weekday&&t.periodo===periodo);}
 function ocupadas(turmaId,iso){return S.aulas.filter(a=>a.turmaId===turmaId&&a.status==='agendada'&&sameDay(a.data,iso)).length;}
-function vagasNoPeriodo(iso,periodo){const wd=D(iso).getDay();let v=0;turmasDe(wd,periodo).forEach(function(t){v+=Math.max(0,alunasNaTurma(t.id)-ocupadas(t.id,iso));});return v;}
+function vagasNoPeriodo(iso,periodo){var wd=D(iso).getDay();var v=0;turmasDe(wd,periodo).forEach(function(t){v+=vagaData(t.id,iso);});return v;}
 function diaTemVaga(iso){return ['manha','tarde','noite'].some(p=>vagasNoPeriodo(iso,p)>0);}
-function turmaComVaga(iso,periodo){const ts=turmasDe(D(iso).getDay(),periodo);for(const t of ts){if(ocupadas(t.id,iso)<alunasNaTurma(t.id))return t;}return null;}
+function turmaComVaga(iso,periodo){var ts=turmasDe(D(iso).getDay(),periodo);for(var i=0;i<ts.length;i++){if(vagaData(ts[i].id,iso)>0)return ts[i];}return null;}
 function alunaTemAulaNo(alunaId,iso,periodo,exceptId){return S.aulas.some(a=>a.alunaId===alunaId&&a.status==='agendada'&&a.periodo===periodo&&sameDay(a.data,iso)&&a.id!==exceptId);}
 function diaTemAula(iso){const wd=D(iso).getDay();return S.turmas.some(t=>DOW[t.dia]===wd);}
 function aulaDateTime(a){const d=D(a.data);if(a.hora){const p=(''+a.hora).split(':');d.setHours(parseInt(p[0])||0,parseInt(p[1])||0,0,0);}return d;}
@@ -247,6 +247,9 @@ function limparOrfaos(){if(!S||!S.alunas)return false;var ids={};S.alunas.forEac
 function repararAgenda(){if(!S||!S.alunas)return false;var mudou=false;S.alunas.forEach(function(a){var quer={};if(a.turmaId)quer[a.turmaId]=1;if(a.turmaId2)quer[a.turmaId2]=1;var temAg={};S.aulas.forEach(function(x){if(x.alunaId===a.id&&x.origem==='pacote'&&x.status==='agendada')temAg[x.turmaId]=1;});var extra=Object.keys(temAg).some(function(t){return !quer[t];});var falta=Object.keys(quer).some(function(t){return !temAg[t];});if(extra||falta){S.aulas=S.aulas.filter(function(x){return !(x.alunaId===a.id&&x.origem==='pacote'&&x.status==='agendada');});gerarAulas(a);mudou=true;}});return mudou;}
 function excluirAula(id){var a=S.aulas.find(function(x){return x.id===id;});if(!a)return;ask('Excluir esta aula da agenda?',function(){if(a.status==='agendada'){var al=S.alunas.find(function(x){return x.id===a.alunaId;});if(al){if(a.origem==='reposicao'){al.reposicao=(al.reposicao||0)+1;}else if(a.origem==='extra'){var p=pendMensalidade(al.id);if(p&&p.qtdExtras>0){p.extras=Math.max(0,(p.extras||0)-valorExtraCfg());p.qtdExtras-=1;}}}}S.aulas=S.aulas.filter(function(x){return x.id!==id;});save();render();toast(a.origem==='reposicao'?'Aula excluída — bônus devolvido 💚':'Aula excluída.');});}
 function alunasNaTurma(tid){var s={};S.aulas.forEach(function(a){if(a.turmaId===tid&&a.origem==='pacote'&&a.status!=='cancelada')s[a.alunaId]=1;});return Object.keys(s).length;}
+function ocupadasReais(tid,iso){return S.aulas.filter(function(a){return a.turmaId===tid&&a.status!=='cancelada'&&sameDay(a.data,iso);}).length;}
+function vagaData(tid,iso){return Math.max(0,alunasNaTurma(tid)-ocupadasReais(tid,iso));}
+function vagasTurma(tid){var seen={},v=0;S.aulas.forEach(function(x){if(x.turmaId===tid&&x.status==='agendada'){var k=dm(x.data);if(!seen[k]){seen[k]=1;v+=vagaData(tid,x.data);}}});return v;}
 function scrAulasDia(){var ag=S.aulas.filter(function(a){return a.status==='agendada';}).sort(function(x,y){return (D(x.data)-D(y.data))||(PERIODOS.indexOf(x.periodo)-PERIODOS.indexOf(y.periodo));});if(!ag.length)return empty('Nenhuma aula agendada.');var days={};var order=[];ag.forEach(function(a){var dk=dm(a.data);if(!days[dk]){days[dk]={iso:a.data,turmas:{},torder:[]};order.push(dk);}var d=days[dk];if(!d.turmas[a.turmaId]){d.turmas[a.turmaId]=[];d.torder.push(a.turmaId);}d.turmas[a.turmaId].push(alunaNome(a.alunaId));});var out='<div class="d-s">Suas aulas organizadas por dia.</div>';order.forEach(function(dk){var d=days[dk];out+='<div class="d-section" style="font-size:14px;font-weight:600;color:var(--pinkT);margin-top:16px">'+cap(dow(d.iso))+' · '+dm(d.iso)+'</div>';d.torder.forEach(function(tid){var t=S.turmas.find(function(x){return x.id===tid;});var nomes=d.turmas[tid];out+='<div class="d-card"><div class="d-b" style="font-size:13.5px">'+(t?esc(t.nome):'Turma')+' <span class="d-s" style="font-weight:400">('+nomes.length+')</span></div><div class="d-s2">'+nomes.map(esc).join(', ')+'</div></div>';});});return out;}
 function gerarAcessos(){var used={};var fila=[];S.alunas.forEach(function(a){var base=slugNome(a.nome);if(!base)return;var email=base+'costurete@gmail.com';var n=2;while(used[email]){email=base+n+'costurete@gmail.com';n++;}used[email]=true;a.email=email;fila.push({email:email});});save();var i=0,ok=0,ja=0,er=0;function prox(){if(i>=fila.length){render();toast('Acessos: '+ok+' criados, '+ja+' já existiam'+(er?', '+er+' erro(s)':'')+' · senha: costurete');return;}var em=fila[i++].email;var sec;try{sec=firebase.app('secondary');}catch(e){sec=firebase.initializeApp(FIREBASE_CONFIG,'secondary');}sec.auth().createUserWithEmailAndPassword(em,'costurete').then(function(){return sec.auth().signOut();}).then(function(){ok++;prox();}).catch(function(err){var c=(err&&err.code)||'';if(c.indexOf('email-already-in-use')>=0)ja++;else er++;prox();});}toast('Criando acessos… aguarde uns segundos');prox();}
 var _notifInit=false,_lastAvisoTs=0,_seenOfertas={};
@@ -257,9 +260,12 @@ function pedirNotif(){if(typeof Notification==='undefined'){toast('Seu navegador
 function cardNotif(){if(typeof Notification==='undefined'||Notification.permission==='granted')return '';return '<div class="d-card" style="background:var(--lilacL);border:none"><div class="d-b" style="color:var(--lilacT)">🔔 Ativar notificações</div><div class="d-s2">Receba avisos e vagas na hora, direto no celular.</div><button class="d-cta small" onclick="pedirNotif()" style="margin-top:8px">Ativar agora</button></div>';}
 var _pushReg=false;
 function registrarPush(){if(_pushReg)return;if(typeof Notification==='undefined'||Notification.permission!=='granted')return;if(!(navigator&&navigator.serviceWorker)||!firebase.messaging)return;_pushReg=true;try{var messaging=firebase.messaging();navigator.serviceWorker.register('firebase-messaging-sw.js').then(function(reg){return messaging.getToken({vapidKey:VAPID,serviceWorkerRegistration:reg});}).then(function(token){if(token&&db){db.collection('pushTokens').doc(token).set({mode:V.mode||'',alunaId:V.alunaId||'',email:emailOf(),ts:Date.now()});}}).catch(function(e){_pushReg=false;});}catch(e){_pushReg=false;}}
+function verComoAluna(id){V.verComo=id;V.mode='aluna';V.alunaId=id;V.screen='a_home';V.tmp={};render();}
+function voltarPainel(){V.verComo=null;V.mode='prof';V.screen='p_home';V.tmp={};render();}
+function scrVerAluna(){if(!S.alunas.length)return empty('Nenhuma aluna cadastrada.');return '<div class="d-s">Toque numa aluna para ver o app do jeitinho que ela vê. Depois é só voltar ao seu painel.</div>'+S.alunas.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);}).map(function(a){return '<div class="d-card d-row" onclick="verComoAluna(\''+a.id+'\')"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(a.nome)+'</div><div class="d-s">'+esc(turmaLabel(a.turmaId))+'</div></div><div style="color:var(--muted)">›</div></div>';}).join('');}
 function delAluna(id){ask('Remover esta aluna e os dados dela (aulas e pagamentos)?',function(){S.alunas=S.alunas.filter(function(a){return a.id!==id;});S.aulas=S.aulas.filter(function(x){return x.alunaId!==id;});S.pagamentos=S.pagamentos.filter(function(p){return p.alunaId!==id;});S.ofertas=S.ofertas.filter(function(o){return o.origem!==id;});save();go('p_alunas');toast('Aluna removida');});}
 function marcar(id,st){const a=S.aulas.find(x=>x.id===id);if(!a)return;a.status=st;save();render();toast(st==='concluida'?'Presença registrada ✓':'Falta registrada');}
-function agendarReposicao(){const a=curAluna();if((a.reposicao||0)<=0){toast('Você não tem reposição disponível');return;}if(!V.tmp.dia||!V.tmp.periodo){toast('Escolha data e período');return;}const t=turmaComVaga(V.tmp.dia,V.tmp.periodo);if(!t){toast('Sem vagas nesse período');return;}S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:V.tmp.dia,periodo:V.tmp.periodo,hora:t.inicio,status:'agendada',confirmacao:'confirmada',origem:'reposicao'});a.reposicao-=1;save();go('a_home');toast('Reposição agendada! Sem custo 💚');}
+function agendarReposicao(){const a=curAluna();if((a.reposicao||0)<=0){toast('Você não tem reposição disponível');return;}if(!V.tmp.dia||!V.tmp.periodo){toast('Escolha data e período');return;}const t=turmaComVaga(V.tmp.dia,V.tmp.periodo);if(!t){toast('Sem vagas nesse período');return;}var _o=S.ofertas.find(function(o){return o.aberta&&o.periodo===V.tmp.periodo&&sameDay(o.data,V.tmp.dia);});if(_o)_o.aberta=false;S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:V.tmp.dia,periodo:V.tmp.periodo,hora:t.inicio,status:'agendada',confirmacao:'confirmada',origem:'reposicao'});a.reposicao-=1;save();go('a_home');toast('Reposição agendada! Sem custo 💚');}
 function irRemarcar(id){V.param=id;go('a_remarcar');}
 function origemTag(o){return o==='extra'?'<span class="pill lilac">Extra</span>':(o==='reposicao'?'<span class="pill ok">Reposição</span>':'');}
 function enviarAviso(){const t=val('av_t'),m=val('av_m');if(!t.trim()||!m.trim()){toast('Preencha título e mensagem');return;}S.avisos.push({id:uid(),titulo:t.trim(),msg:m.trim(),ts:Date.now()});save();go('p_avisos');toast('Aviso enviado a todas 💌');}
@@ -278,8 +284,8 @@ function recusarAula(id){const a=S.aulas.find(x=>x.id===id);if(!a)return;
   ask('Não vai poder vir? Como você avisou com antecedência, a vaga é liberada para as outras alunas e você ganha o direito de repor dentro do mês.',function(){a.status='cancelada';a.confirmacao='recusada';S.ofertas.push({id:uid(),turmaId:a.turmaId,data:a.data,periodo:a.periodo,hora:a.hora,origem:a.alunaId,aberta:true});const al=S.alunas.find(x=>x.id===a.alunaId);if(al)al.reposicao=(al.reposicao||0)+1;save();render();toast('Vaga liberada para as outras alunas 💛');});}
 function selDia(iso){V.tmp.dia=iso;V.tmp.periodo=null;render();}
 function selPer(p){V.tmp.periodo=p;render();}
-function confirmarRemarcar(){const a=S.aulas.find(x=>x.id===V.param);if(!a)return;if(!V.tmp.dia){toast('Escolha o novo dia');return;}const per=V.tmp.periodo||a.periodo;const t=turmaComVaga(V.tmp.dia,per);if(!t){toast('Sem vagas nesse dia/período');return;}const de=dow(a.data)+' ('+dm(a.data)+')';const para=dow(V.tmp.dia)+' ('+dm(V.tmp.dia)+')';ask('Remarcar sua aula de '+de+' para '+para+'? Sua vaga de '+de+' será liberada.',function(){a.data=V.tmp.dia;a.periodo=per;a.turmaId=t.id;a.hora=t.inicio;a.confirmacao='pendente';save();go('a_agenda');toast('Remarcada! Aguarde a confirmação da professora.');});}
-function reservarExtra(){if(!V.tmp.dia||!V.tmp.periodo){toast('Escolha data e período');return;}const t=turmaComVaga(V.tmp.dia,V.tmp.periodo);if(!t){toast('Sem vagas nesse período');return;}const a=curAluna();const origem=usarCreditoOuCobrar(a);S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:V.tmp.dia,periodo:V.tmp.periodo,hora:t.inicio,status:'agendada',confirmacao:'confirmada',origem:origem});save();go('a_home');toast(origem==='reposicao'?'Agendada com reposição — sem custo 💚':'✓ Somado à mensalidade');}
+function confirmarRemarcar(){var a=S.aulas.find(function(x){return x.id===V.param;});if(!a)return;if(!V.tmp.dia){toast('Escolha o novo dia');return;}var per=V.tmp.periodo||a.periodo;var ts=turmasDe(D(V.tmp.dia).getDay(),per);var t=ts[0];if(!t){toast('Não há aula nesse dia/período');return;}if(alunaTemAulaNo(a.id,V.tmp.dia,per,a.id)){toast('Você já tem aula nesse dia');return;}var de=dow(a.data)+' ('+dm(a.data)+')';var para=dow(V.tmp.dia)+' ('+dm(V.tmp.dia)+')';ask('Trocar sua aula de '+de+' para '+para+'? A sua vaga de '+de+' fica livre para outra aluna.',function(){S.ofertas.push({id:uid(),turmaId:a.turmaId,data:a.data,periodo:a.periodo,hora:a.hora,origem:a.alunaId,aberta:true});a.data=V.tmp.dia;a.periodo=per;a.turmaId=t.id;a.hora=t.inicio;a.confirmacao='pendente';save();go('a_agenda');toast('Trocada! Aguarde a confirmação da professora.');});}
+function reservarExtra(){if(!V.tmp.dia||!V.tmp.periodo){toast('Escolha data e período');return;}const t=turmaComVaga(V.tmp.dia,V.tmp.periodo);if(!t){toast('Sem vagas nesse período');return;}const a=curAluna();const origem=usarCreditoOuCobrar(a);var _o=S.ofertas.find(function(o){return o.aberta&&o.periodo===V.tmp.periodo&&sameDay(o.data,V.tmp.dia);});if(_o)_o.aberta=false;S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:V.tmp.dia,periodo:V.tmp.periodo,hora:t.inicio,status:'agendada',confirmacao:'confirmada',origem:origem});save();go('a_home');toast(origem==='reposicao'?'Agendada com reposição — sem custo 💚':'✓ Somado à mensalidade');}
 function aceitarVaga(id){const o=S.ofertas.find(x=>x.id===id);if(!o||!o.aberta){toast('Vaga já preenchida');render();return;}const a=curAluna();const origem=usarCreditoOuCobrar(a);S.aulas.push({id:uid(),alunaId:a.id,turmaId:o.turmaId,data:o.data,periodo:o.periodo,hora:o.hora,status:'agendada',confirmacao:'confirmada',origem:origem});o.aberta=false;save();render();toast(origem==='reposicao'?'Vaga garantida com reposição — sem custo 💚':'✓ Vaga garantida! Somada à mensalidade');}
 
 /* ---------- util UI ---------- */
@@ -311,6 +317,7 @@ function scrProfHome(){
    big('💳','Pagamentos','Ver quem pagou e dar baixa',"go('p_pagamentos')")+
    big('✅','Presença','Marcar presente / faltou',"go('p_presenca')")+
    big('🗓️','Aulas por dia','Sua agenda organizada por dia',"go('p_aulas_dia')")+
+   big('👀','Ver como aluna','Veja o app do jeito que a aluna vê',"go('p_ver_aluna')")+
    big('📣','Avisos','Enviar comunicado',"go('p_avisos')")+
    '<div class="d-section">Conta</div>'+logoutRow();
 }
@@ -360,7 +367,7 @@ function scrPresenca(){
   var ts=S.turmas.slice().sort(function(a,b){return (DIAS_SEMANA.indexOf(a.dia)-DIAS_SEMANA.indexOf(b.dia))||(PERIODOS.indexOf(a.periodo)-PERIODOS.indexOf(b.periodo));});
   if(!ts.length)return empty('Crie as turmas primeiro.');
   return '<div class="d-s">Toque numa turma para marcar a presença.</div>'+ts.map(function(t){
-    var n=alunasNaTurma(t.id);var vg=S.ofertas.filter(function(o){return o.turmaId===t.id&&o.aberta;}).length;
+    var n=alunasNaTurma(t.id);var vg=vagasTurma(t.id);
     return '<div class="d-card d-row" onclick="V.param=\''+t.id+'\';go(\'p_presenca_turma\')"><div class="d-ic">📅</div><div class="d-grow"><div class="d-b">'+esc(t.nome)+'</div><div class="d-s">'+t.inicio+'–'+t.fim+' · '+n+' aluna'+(n!==1?'s':'')+'</div></div>'+(vg>0?'<span class="pill ok">'+vg+' vaga'+(vg>1?'s':'')+'</span>':'')+'</div>';
   }).join('');
 }
@@ -368,7 +375,7 @@ function scrPresencaTurma(){
   var t=S.turmas.find(function(x){return x.id===V.param;});if(!t)return empty('Turma não encontrada.');
   var ag=S.aulas.filter(function(a){return a.turmaId===t.id&&a.status==='agendada';}).sort(function(x,y){return D(x.data)-D(y.data);});
   var out='<div class="d-tint"><div class="d-eyebrow">'+esc(t.nome)+'</div><div class="d-s" style="color:var(--pinkT);margin-top:4px">'+t.inicio+'–'+t.fim+' · capacidade '+t.cap+'</div></div>';
-  if(!ag.length){out+=empty('Nenhuma aula agendada nesta turma.');}else{var lastD='';ag.forEach(function(a){var dk=dm(a.data);if(dk!==lastD){var vg=Math.max(0,alunasNaTurma(t.id)-ocupadas(t.id,a.data));out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span>'+cap(dow(a.data))+' '+dm(a.data)+'</span><span class="pill '+(vg>0?'ok':'lilac')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'completa')+'</span></div>';lastD=dk;}out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+(a.origem==='reposicao'?'Reposição':a.origem==='extra'?'Aula extra':'Aula fixa')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';});}
+  if(!ag.length){out+=empty('Nenhuma aula agendada nesta turma.');}else{var lastD='';ag.forEach(function(a){var dk=dm(a.data);if(dk!==lastD){var vg=vagaData(t.id,a.data);out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span>'+cap(dow(a.data))+' '+dm(a.data)+'</span><span class="pill '+(vg>0?'ok':'lilac')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'completa')+'</span></div>';lastD=dk;}out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+(a.origem==='reposicao'?'Reposição':a.origem==='extra'?'Aula extra':'Aula fixa')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';});}
   var hist=S.aulas.filter(function(a){return a.turmaId===t.id&&(a.status==='cancelada'||a.status==='falta'||a.status==='concluida');}).sort(function(x,y){return D(y.data)-D(x.data);}).slice(0,25);
   if(hist.length){out+='<div class="d-section" style="margin-top:18px">Histórico</div>';hist.forEach(function(a){var tag=a.status==='cancelada'?'<span class="pill warn">Desmarcou</span>':a.status==='falta'?'<span class="pill dang">Faltou</span>':'<span class="pill ok">Presente</span>';out+='<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13.5px">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+cap(dow(a.data))+' '+dm(a.data)+'</div></div>'+tag+'</div>';});}
   return out;
@@ -440,47 +447,21 @@ function scrAlunaHome(){
 function scrAgenda(){
   const a=curAluna();const now=new Date();
   const list=S.aulas.filter(x=>x.alunaId===a.id&&x.status==='agendada'&&D(x.data)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((x,y)=>D(x.data)-D(y.data));
-  const ofertas=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id);
+  const ofertas=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
   let h='';
   if(ofertas.length)h+='<div class="banner" onclick="go(\'a_vagas\')">🔔 <span style="flex:1">Abriu '+ofertas.length+' vaga'+(ofertas.length>1?'s':'')+'! Toque para ver.</span> ›</div>';
   h+='<div class="d-section">Próximas aulas</div>';
   if(!list.length)return h+empty('Nenhuma aula agendada.');
   h+=list.map(a2=>{
     const conf=a2.confirmacao==='confirmada';
-    const acts=conf?'<div style="display:flex;align-items:center;gap:6px;color:var(--okt);font-size:12.5px;font-weight:600">✓ Presença confirmada</div>':
-      '<button class="d-cta small" onclick="confirmarAula(\''+a2.id+'\')">Confirmar presença</button>'+
-      '<div class="d-actions" style="margin-top:8px"><button class="d-btn line" onclick="irRemarcar(\''+a2.id+'\')">↻ Remarcar</button><button class="d-btn line" onclick="recusarAula(\''+a2.id+'\')">Não vou poder</button></div>';
+    const acts=(conf?'<div style="display:flex;align-items:center;gap:6px;color:var(--okt);font-size:12.5px;font-weight:600;margin-bottom:8px">✓ Presença confirmada</div><button class="d-btn no" style="width:100%" onclick="recusarAula(\''+a2.id+'\')">✕ Não vou poder ir</button>':'<div class="d-s2" style="margin-bottom:6px">Você vai poder vir nesse dia?</div><div class="d-actions"><button class="d-btn ok" onclick="confirmarAula(\''+a2.id+'\')">✓ Vou sim</button><button class="d-btn no" onclick="recusarAula(\''+a2.id+'\')">✕ Não vou poder</button></div>')+'<button class="d-cta ghost small" style="margin-top:8px" onclick="irRemarcar(\''+a2.id+'\')">↻ Trocar para outro dia</button>';
     return '<div class="d-card"><div style="display:flex;align-items:center;gap:14px">'+badge(a2.data)+'<div class="d-grow"><div class="d-b">'+dow(a2.data)+'</div><div class="d-s">'+dm(a2.data)+' · '+(a2.hora||'')+' '+PER_LABEL[a2.periodo]+'</div></div>'+origemTag(a2.origem)+'</div>'+acts+'</div>';
   }).join('');
   return h;
 }
-function diaChips(dias){dias=dias||proxDiasComAula(5);
-  return '<div class="chiprow">'+dias.map(d=>{const iso=d.toISOString();const sel=V.tmp.dia===iso;const vaga=diaTemVaga(iso);
-    return '<div class="chip'+(sel?' sel':'')+'" onclick="selDia(\''+iso+'\')"><div style="font-size:10px;opacity:.8">'+cap(new Intl.DateTimeFormat('pt-BR',{weekday:'short'}).format(d)).replace('.','')+'</div><div style="font-size:15px;font-weight:600">'+d.getDate()+'</div><span class="dot '+(vaga?'ok':'no')+'"></span></div>';}).join('')+'</div>'+
-    '<div class="legend"><span><span class="dot ok"></span>com vaga</span><span><span class="dot no"></span>lotado</span></div>';}
-function perChips(){
-  if(!V.tmp.dia)return '<div class="d-s">Escolha o dia para ver os períodos com vaga.</div>';
-  const a=curAluna();const exc=V.screen==='a_remarcar'?V.param:null;
-  return ['manha','tarde','noite'].map(p=>{
-    if(alunaTemAulaNo(a.id,V.tmp.dia,p,exc))
-      return '<div class="periodrow off"><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill lilac">Você já tem aula</span></div>';
-    const v=vagasNoPeriodo(V.tmp.dia,p);const has=v>0;const sel=V.tmp.periodo===p;
-    return '<div class="periodrow'+(sel?' sel':'')+(has?'':' off')+'"'+(has?' onclick="selPer(\''+p+'\')"':'')+'><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill '+(has?'ok':'dang')+'">'+(has?(v+(v>1?' vagas':' vaga')):'Sem vagas')+'</span></div>';}).join('');}
-function scrRemarcar(){
-  const a=S.aulas.find(x=>x.id===V.param);
-  if(!a)return empty('Aula não encontrada.');
-  const dias=diasDaSemanaDe(a.data).filter(function(d){return diaTemAula(d.toISOString());});
-  const voltar='<button class="d-cta ghost" onclick="go(\'a_agenda\')">Voltar</button>';
-  let h='<div class="d-tint"><div class="d-eyebrow">SUA AULA DESTA SEMANA</div>'+
-    '<div class="d-b" style="margin-top:6px;font-size:16px">'+cap(dow(a.data))+' · '+dm(a.data)+' · '+PER_LABEL[a.periodo]+'</div>'+
-    '<div class="d-s" style="color:var(--pinkT);margin-top:4px">Ao remarcar, sua vaga deste dia é liberada e você escolhe <b>outro dia da mesma semana</b>.</div></div>';
-  if(!dias.length)return h+'<div class="warn">Não há outro dia com aula nesta semana para remarcar. Se não puder vir, use <b>Não vou poder</b> para liberar a vaga.</div>'+voltar;
-  h+='<div class="d-section">Escolha outro dia (mesma semana)</div>'+diaChips(dias)+
-     '<div class="d-section">Escolha o período</div>'+perChips()+
-     '<button class="d-cta" onclick="confirmarRemarcar()">Liberar vaga e remarcar</button>'+
-     voltar;
-  return h;
-}
+function diaChips(dias,remarc){dias=dias||proxDiasComAula(5);return '<div class="chiprow">'+dias.map(function(d){var iso=d.toISOString();var sel=V.tmp.dia===iso;var vaga=diaTemVaga(iso);return '<div class="chip'+(sel?' sel':'')+'" onclick="selDia(\''+iso+'\')"><div style="font-size:10px;opacity:.8">'+cap(new Intl.DateTimeFormat('pt-BR',{weekday:'short'}).format(d)).replace('.','')+'</div><div style="font-size:15px;font-weight:600">'+d.getDate()+'</div>'+(remarc?'':'<span class="dot '+(vaga?'ok':'no')+'"></span>')+'</div>';}).join('')+'</div>'+(remarc?'':'<div class="legend"><span><span class="dot ok"></span>com vaga</span><span><span class="dot no"></span>lotado</span></div>');}
+function perChips(){if(!V.tmp.dia)return '<div class="d-s">Escolha o dia para ver os períodos.</div>';var a=curAluna();var exc=V.screen==='a_remarcar'?V.param:null;var remarc=V.screen==='a_remarcar';return ['manha','tarde','noite'].map(function(p){if(alunaTemAulaNo(a.id,V.tmp.dia,p,exc))return '<div class="periodrow off"><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill lilac">Você já tem aula</span></div>';if(remarc){var temTurma=turmasDe(D(V.tmp.dia).getDay(),p).length>0;var sel=V.tmp.periodo===p;if(!temTurma)return '<div class="periodrow off"><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill dang">Sem aula</span></div>';return '<div class="periodrow'+(sel?' sel':'')+'" onclick="selPer(\''+p+'\')"><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill ok">Disponível</span></div>';}var v=vagasNoPeriodo(V.tmp.dia,p);var has=v>0;var sel=V.tmp.periodo===p;return '<div class="periodrow'+(sel?' sel':'')+(has?'':' off')+'"'+(has?' onclick="selPer(\''+p+'\')"':'')+'><span style="font-size:14px;font-weight:500">'+PER_LABEL[p]+'</span><span class="pill '+(has?'ok':'dang')+'">'+(has?(v+(v>1?' vagas':' vaga')):'Sem vagas')+'</span></div>';}).join('');}
+function scrRemarcar(){var a=S.aulas.find(function(x){return x.id===V.param;});if(!a)return empty('Aula não encontrada.');var dias=proxDiasComAula(12).filter(function(d){return !sameDay(d,a.data);});var voltar='<button class="d-cta ghost" onclick="go(\'a_agenda\')">Voltar</button>';var h='<div class="d-tint"><div class="d-eyebrow">TROCAR ESTA AULA</div><div class="d-b" style="margin-top:6px;font-size:16px">'+cap(dow(a.data))+' · '+dm(a.data)+' · '+PER_LABEL[a.periodo]+'</div><div class="d-s" style="color:var(--pinkT);margin-top:4px">Escolha um <b>novo dia</b> para essa aula. A sua vaga do dia atual fica livre para outra aluna.</div></div>';if(!dias.length)return h+'<div class="warn">Não há outros dias com aula por enquanto.</div>'+voltar;h+='<div class="d-section">Escolha o novo dia</div>'+diaChips(dias,true)+'<div class="d-section">Escolha o período</div>'+perChips()+'<button class="d-cta" onclick="confirmarRemarcar()">Trocar para esse dia</button>'+voltar;return h;}
 function scrReposicao(){
   const a=curAluna();const n=a.reposicao||0;
   let h='<div class="d-card" style="background:var(--okbg);border:none">'+
@@ -524,7 +505,7 @@ function scrRecibo(){
    '</div>';
 }
 function scrVagas(){
-  const a=curAluna();const list=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id);
+  const a=curAluna();const list=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
   let h=(a.reposicao||0)>0
     ? '<div class="warn" style="background:var(--okbg);color:var(--okt)">A primeira que aceitar leva. Você tem reposição — pegar esta vaga será <b>sem custo</b>.</div>'
     : '<div class="warn">A primeira que aceitar leva. Conta como aula extra: '+money(valorExtraCfg())+' somados à mensalidade.</div>';
@@ -610,6 +591,7 @@ const SCREENS={
   p_avisos:{t:'Avisos',nav:'prof',f:scrAvisos},
   p_relatorios:{t:'Relatórios',nav:'prof',f:scrRelatorios},
   p_aulas_dia:{t:'Aulas por dia',back:'p_home',f:scrAulasDia},
+  p_ver_aluna:{t:'Ver como aluna',back:'p_home',f:scrVerAluna},
   a_home:{t:function(){return 'Olá, '+curAluna().nome.split(' ')[0]+' 👋';},nav:'aluna',f:scrAlunaHome},
   a_agenda:{t:'Agenda',nav:'aluna',f:scrAgenda},
   a_avisos:{t:'Avisos',back:'a_home',f:scrAlunaAvisos},
@@ -630,7 +612,7 @@ function render(){
   const title=typeof sc.t==='function'?sc.t():sc.t;
   let bell='';
   if(V.mode==='aluna'&&V.screen!=='a_avisos'){const n=avisosNaoLidos();bell='<button class="bell" onclick="abrirAvisos()">🔔'+(n>0?'<span class="badge">'+n+'</span>':'')+'</button>';}
-  let h='<div class="d-appbar">'+(sc.back?'<button class="d-back" onclick="go(\''+sc.back+'\')">‹</button>':'')+'<div class="d-title">'+title+'</div>'+bell+'</div>';
+  let h=(V.verComo?'<div class="vercomo" onclick="voltarPainel()">👀 Vendo como <b>'+esc(alunaNome(V.verComo))+'</b> · ‹ Voltar ao painel</div>':'')+'<div class="d-appbar">'+(sc.back?'<button class="d-back" onclick="go(\''+sc.back+'\')">‹</button>':'')+'<div class="d-title">'+title+'</div>'+bell+'</div>';
   h+='<div class="d-content">'+sc.f()+'</div>';
   h+=sc.nav?bottomNav(sc.nav):'';
   document.getElementById('app').innerHTML=h;
@@ -654,13 +636,13 @@ function route(){
   if(!authUser){if(isInputScreen(V.screen))return;if(!isLoginScreen(V.screen))V.screen='inicio';render();return;}
   var r=computeRole();
   if(r.mode==='pending'){V.mode='pending';V.screen='pending';render();return;}
-  V.mode=r.mode;if(r.alunaId)V.alunaId=r.alunaId;
-  if(isLoginScreen(V.screen)||V.screen==='pending'||!SCREENS[V.screen]||SCREENS[V.screen].full){V.screen=(r.mode==='prof'?'p_home':'a_home');render();return;}
+  if(r.mode==='prof'&&V.verComo){V.mode='aluna';V.alunaId=V.verComo;}else{V.mode=r.mode;if(r.alunaId)V.alunaId=r.alunaId;}
+  if(isLoginScreen(V.screen)||V.screen==='pending'||!SCREENS[V.screen]||SCREENS[V.screen].full){V.screen=(V.mode==='prof'?'p_home':'a_home');render();return;}
   if(isInputScreen(V.screen))return;
   render();
 }
 function sair(){V={screen:'inicio',tmp:{},loginRole:null,signup:false};if(auth)auth.signOut();}
-function logoutRow(){return '<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13px;word-break:break-all">'+esc(emailOf())+'</div><div class="d-s">Você está conectada</div></div><button class="d-cta ghost" style="width:auto;padding:10px 16px" onclick="sair()">Sair</button></div>';}
+function logoutRow(){if(V.verComo)return '<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13px">👀 Vendo como '+esc(alunaNome(V.verComo))+'</div><div class="d-s">Você é a professora</div></div><button class="d-cta ghost" style="width:auto;padding:10px 16px" onclick="voltarPainel()">Voltar ao painel</button></div>';return '<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13px;word-break:break-all">'+esc(emailOf())+'</div><div class="d-s">Você está conectada</div></div><button class="d-cta ghost" style="width:auto;padding:10px 16px" onclick="sair()">Sair</button></div>';}
 function scrPending(){return '<div class="welcome"><div class="w-logo"><img src="'+LOGO+'" alt="Danda Reis"></div><div class="w-name" style="font-size:22px">Quase lá!</div><div class="w-tag">Sua conta foi criada com<br><b>'+esc(emailOf())+'</b>.<br><br>Peça para a professora te cadastrar em <b>Alunas</b> usando esse mesmo e-mail. Depois é só entrar de novo. 💕</div><div class="w-btns"><button class="d-cta ghost" onclick="sair()">Sair</button></div></div>';}
 function msgErr(e){var c=(e&&e.code)||'';if(c.indexOf('wrong-password')>=0||c.indexOf('invalid-credential')>=0||c.indexOf('invalid-login')>=0)return 'E-mail ou senha incorretos.';if(c.indexOf('user-not-found')>=0)return 'Conta não encontrada. Toque em "Criar acesso".';if(c.indexOf('email-already-in-use')>=0)return 'Este e-mail já tem conta. Toque em "Entrar".';if(c.indexOf('weak-password')>=0)return 'A senha precisa de 6 caracteres ou mais.';if(c.indexOf('invalid-email')>=0)return 'E-mail inválido.';if(c.indexOf('unauthorized-domain')>=0)return 'Falta liberar o link no Firebase: Authentication → Settings → Authorized domains → juhreismiranda3-blip.github.io';if(c.indexOf('operation-not-allowed')>=0||c.indexOf('configuration-not-found')>=0)return 'Ligue o login E-mail/senha no Firebase: Authentication → Sign-in method.';if(c.indexOf('network')>=0)return 'Sem conexão. Tente de novo.';if(c.indexOf('too-many-requests')>=0)return 'Muitas tentativas. Espere um pouquinho.';if(c.indexOf('api-key')>=0||c.indexOf('app-not-authorized')>=0)return 'Chave do Firebase não confere. Me avise.';return 'Não consegui: '+(c||'erro desconhecido');}
 function boot(){
