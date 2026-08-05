@@ -205,9 +205,9 @@ function usarCreditoOuCobrar(al){if((al.reposicao||0)>0){al.reposicao-=1;return 
 function sameDay(a,b){const x=D(a),y=D(b);return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate();}
 function turmasDe(weekday,periodo){return S.turmas.filter(t=>DOW[t.dia]===weekday&&t.periodo===periodo);}
 function ocupadas(turmaId,iso){return S.aulas.filter(a=>a.turmaId===turmaId&&a.status==='agendada'&&sameDay(a.data,iso)).length;}
-function vagasNoPeriodo(iso,periodo){return S.ofertas.filter(function(o){return o.aberta&&o.periodo===periodo&&sameDay(o.data,iso);}).length;}
+function vagasNoPeriodo(iso,periodo){var wd=D(iso).getDay();var v=0;turmasDe(wd,periodo).forEach(function(t){v+=vagaData(t.id,iso);});return v;}
 function diaTemVaga(iso){return ['manha','tarde','noite'].some(p=>vagasNoPeriodo(iso,p)>0);}
-function turmaComVaga(iso,periodo){var o=S.ofertas.find(function(x){return x.aberta&&x.periodo===periodo&&sameDay(x.data,iso);});return o?S.turmas.find(function(t){return t.id===o.turmaId;}):null;}
+function turmaComVaga(iso,periodo){var ts=turmasDe(D(iso).getDay(),periodo);for(var i=0;i<ts.length;i++){if(vagaData(ts[i].id,iso)>0)return ts[i];}return null;}
 function alunaTemAulaNo(alunaId,iso,periodo,exceptId){return S.aulas.some(a=>a.alunaId===alunaId&&a.status==='agendada'&&a.periodo===periodo&&sameDay(a.data,iso)&&a.id!==exceptId);}
 function diaTemAula(iso){const wd=D(iso).getDay();return S.turmas.some(t=>DOW[t.dia]===wd);}
 function aulaDateTime(a){const d=D(a.data);if(a.hora){const p=(''+a.hora).split(':');d.setHours(parseInt(p[0])||0,parseInt(p[1])||0,0,0);}return d;}
@@ -248,6 +248,9 @@ function limparOrfaos(){if(!S||!S.alunas)return false;var ids={};S.alunas.forEac
 function repararAgenda(){if(!S||!S.alunas)return false;var mudou=false;S.alunas.forEach(function(a){var quer={};if(a.turmaId)quer[a.turmaId]=1;if(a.turmaId2)quer[a.turmaId2]=1;var temAg={};S.aulas.forEach(function(x){if(x.alunaId===a.id&&x.origem==='pacote'&&x.status==='agendada')temAg[x.turmaId]=1;});var extra=Object.keys(temAg).some(function(t){return !quer[t];});var falta=Object.keys(quer).some(function(t){return !temAg[t];});if(extra||falta){S.aulas=S.aulas.filter(function(x){return !(x.alunaId===a.id&&x.origem==='pacote'&&x.status==='agendada');});gerarAulas(a);mudou=true;}});return mudou;}
 function excluirAula(id){var a=S.aulas.find(function(x){return x.id===id;});if(!a)return;ask('Excluir esta aula da agenda?',function(){if(a.status==='agendada'){var al=S.alunas.find(function(x){return x.id===a.alunaId;});if(al){if(a.origem==='reposicao'){al.reposicao=(al.reposicao||0)+1;}else if(a.origem==='extra'){var p=pendMensalidade(al.id);if(p&&p.qtdExtras>0){p.extras=Math.max(0,(p.extras||0)-valorExtraCfg());p.qtdExtras-=1;}}}}S.aulas=S.aulas.filter(function(x){return x.id!==id;});save();render();toast(a.origem==='reposicao'?'Aula excluída — bônus devolvido 💚':'Aula excluída.');});}
 function alunasNaTurma(tid){var s={};S.aulas.forEach(function(a){if(a.turmaId===tid&&a.origem==='pacote'&&a.status!=='cancelada')s[a.alunaId]=1;});return Object.keys(s).length;}
+function ocupadasReais(tid,iso){return S.aulas.filter(function(a){return a.turmaId===tid&&a.status!=='cancelada'&&sameDay(a.data,iso);}).length;}
+function vagaData(tid,iso){return Math.max(0,alunasNaTurma(tid)-ocupadasReais(tid,iso));}
+function vagasTurma(tid){var seen={},v=0;S.aulas.forEach(function(x){if(x.turmaId===tid&&x.status==='agendada'){var k=dm(x.data);if(!seen[k]){seen[k]=1;v+=vagaData(tid,x.data);}}});return v;}
 function scrAulasDia(){var ag=S.aulas.filter(function(a){return a.status==='agendada';}).sort(function(x,y){return (D(x.data)-D(y.data))||(PERIODOS.indexOf(x.periodo)-PERIODOS.indexOf(y.periodo));});if(!ag.length)return empty('Nenhuma aula agendada.');var days={};var order=[];ag.forEach(function(a){var dk=dm(a.data);if(!days[dk]){days[dk]={iso:a.data,turmas:{},torder:[]};order.push(dk);}var d=days[dk];if(!d.turmas[a.turmaId]){d.turmas[a.turmaId]=[];d.torder.push(a.turmaId);}d.turmas[a.turmaId].push(alunaNome(a.alunaId));});var out='<div class="d-s">Suas aulas organizadas por dia.</div>';order.forEach(function(dk){var d=days[dk];out+='<div class="d-section" style="font-size:14px;font-weight:600;color:var(--pinkT);margin-top:16px">'+cap(dow(d.iso))+' · '+dm(d.iso)+'</div>';d.torder.forEach(function(tid){var t=S.turmas.find(function(x){return x.id===tid;});var nomes=d.turmas[tid];out+='<div class="d-card"><div class="d-b" style="font-size:13.5px">'+(t?esc(t.nome):'Turma')+' <span class="d-s" style="font-weight:400">('+nomes.length+')</span></div><div class="d-s2">'+nomes.map(esc).join(', ')+'</div></div>';});});return out;}
 function gerarAcessos(){var used={};var fila=[];S.alunas.forEach(function(a){var base=slugNome(a.nome);if(!base)return;var email=base+'costurete@gmail.com';var n=2;while(used[email]){email=base+n+'costurete@gmail.com';n++;}used[email]=true;a.email=email;fila.push({email:email});});save();var i=0,ok=0,ja=0,er=0;function prox(){if(i>=fila.length){render();toast('Acessos: '+ok+' criados, '+ja+' já existiam'+(er?', '+er+' erro(s)':'')+' · senha: costurete');return;}var em=fila[i++].email;var sec;try{sec=firebase.app('secondary');}catch(e){sec=firebase.initializeApp(FIREBASE_CONFIG,'secondary');}sec.auth().createUserWithEmailAndPassword(em,'costurete').then(function(){return sec.auth().signOut();}).then(function(){ok++;prox();}).catch(function(err){var c=(err&&err.code)||'';if(c.indexOf('email-already-in-use')>=0)ja++;else er++;prox();});}toast('Criando acessos… aguarde uns segundos');prox();}
 var _notifInit=false,_lastAvisoTs=0,_seenOfertas={};
@@ -361,7 +364,7 @@ function scrPresenca(){
   var ts=S.turmas.slice().sort(function(a,b){return (DIAS_SEMANA.indexOf(a.dia)-DIAS_SEMANA.indexOf(b.dia))||(PERIODOS.indexOf(a.periodo)-PERIODOS.indexOf(b.periodo));});
   if(!ts.length)return empty('Crie as turmas primeiro.');
   return '<div class="d-s">Toque numa turma para marcar a presença.</div>'+ts.map(function(t){
-    var n=alunasNaTurma(t.id);var vg=S.ofertas.filter(function(o){return o.turmaId===t.id&&o.aberta;}).length;
+    var n=alunasNaTurma(t.id);var vg=vagasTurma(t.id);
     return '<div class="d-card d-row" onclick="V.param=\''+t.id+'\';go(\'p_presenca_turma\')"><div class="d-ic">📅</div><div class="d-grow"><div class="d-b">'+esc(t.nome)+'</div><div class="d-s">'+t.inicio+'–'+t.fim+' · '+n+' aluna'+(n!==1?'s':'')+'</div></div>'+(vg>0?'<span class="pill ok">'+vg+' vaga'+(vg>1?'s':'')+'</span>':'')+'</div>';
   }).join('');
 }
@@ -369,7 +372,7 @@ function scrPresencaTurma(){
   var t=S.turmas.find(function(x){return x.id===V.param;});if(!t)return empty('Turma não encontrada.');
   var ag=S.aulas.filter(function(a){return a.turmaId===t.id&&a.status==='agendada';}).sort(function(x,y){return D(x.data)-D(y.data);});
   var out='<div class="d-tint"><div class="d-eyebrow">'+esc(t.nome)+'</div><div class="d-s" style="color:var(--pinkT);margin-top:4px">'+t.inicio+'–'+t.fim+' · capacidade '+t.cap+'</div></div>';
-  if(!ag.length){out+=empty('Nenhuma aula agendada nesta turma.');}else{var lastD='';ag.forEach(function(a){var dk=dm(a.data);if(dk!==lastD){var vg=S.ofertas.filter(function(o){return o.aberta&&o.turmaId===t.id&&sameDay(o.data,a.data);}).length;out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span>'+cap(dow(a.data))+' '+dm(a.data)+'</span><span class="pill '+(vg>0?'ok':'lilac')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'completa')+'</span></div>';lastD=dk;}out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+(a.origem==='reposicao'?'Reposição':a.origem==='extra'?'Aula extra':'Aula fixa')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';});}
+  if(!ag.length){out+=empty('Nenhuma aula agendada nesta turma.');}else{var lastD='';ag.forEach(function(a){var dk=dm(a.data);if(dk!==lastD){var vg=vagaData(t.id,a.data);out+='<div class="d-section" style="font-size:13px;font-weight:600;color:var(--pinkT);margin-top:14px;display:flex;justify-content:space-between;align-items:center"><span>'+cap(dow(a.data))+' '+dm(a.data)+'</span><span class="pill '+(vg>0?'ok':'lilac')+'">'+(vg>0?vg+' vaga'+(vg>1?'s':''):'completa')+'</span></div>';lastD=dk;}out+='<div class="d-card"><div class="d-row" style="display:flex"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+(a.origem==='reposicao'?'Reposição':a.origem==='extra'?'Aula extra':'Aula fixa')+'</div></div></div><div class="d-actions"><button class="d-btn ok" onclick="marcar(\''+a.id+'\',\'concluida\')">✓ Presente</button><button class="d-btn no" onclick="marcar(\''+a.id+'\',\'falta\')">✕ Faltou</button></div><button class="d-linkbtn" style="color:var(--dangt);margin-top:6px" onclick="excluirAula(\''+a.id+'\')">Excluir esta aula</button></div>';});}
   var hist=S.aulas.filter(function(a){return a.turmaId===t.id&&(a.status==='cancelada'||a.status==='falta'||a.status==='concluida');}).sort(function(x,y){return D(y.data)-D(x.data);}).slice(0,25);
   if(hist.length){out+='<div class="d-section" style="margin-top:18px">Histórico</div>';hist.forEach(function(a){var tag=a.status==='cancelada'?'<span class="pill warn">Desmarcou</span>':a.status==='falta'?'<span class="pill dang">Faltou</span>':'<span class="pill ok">Presente</span>';out+='<div class="d-card d-row"><div class="d-grow"><div class="d-b" style="font-size:13.5px">'+esc(alunaNome(a.alunaId))+'</div><div class="d-s">'+cap(dow(a.data))+' '+dm(a.data)+'</div></div>'+tag+'</div>';});}
   return out;
@@ -441,7 +444,7 @@ function scrAlunaHome(){
 function scrAgenda(){
   const a=curAluna();const now=new Date();
   const list=S.aulas.filter(x=>x.alunaId===a.id&&x.status==='agendada'&&D(x.data)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((x,y)=>D(x.data)-D(y.data));
-  const ofertas=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id);
+  const ofertas=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
   let h='';
   if(ofertas.length)h+='<div class="banner" onclick="go(\'a_vagas\')">🔔 <span style="flex:1">Abriu '+ofertas.length+' vaga'+(ofertas.length>1?'s':'')+'! Toque para ver.</span> ›</div>';
   h+='<div class="d-section">Próximas aulas</div>';
@@ -499,7 +502,7 @@ function scrRecibo(){
    '</div>';
 }
 function scrVagas(){
-  const a=curAluna();const list=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id);
+  const a=curAluna();const list=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
   let h=(a.reposicao||0)>0
     ? '<div class="warn" style="background:var(--okbg);color:var(--okt)">A primeira que aceitar leva. Você tem reposição — pegar esta vaga será <b>sem custo</b>.</div>'
     : '<div class="warn">A primeira que aceitar leva. Conta como aula extra: '+money(valorExtraCfg())+' somados à mensalidade.</div>';
