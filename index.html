@@ -326,7 +326,9 @@ function scrProfHome(){
    big('🗓️','Aulas por dia','Sua agenda organizada por dia',"go('p_aulas_dia')")+
    big('👀','Ver como aluna','Veja o app do jeito que a aluna vê',"go('p_ver_aluna')")+
    big('📣','Avisos','Enviar comunicado',"go('p_avisos')")+
-   '<div class="d-section">Conta</div>'+logoutRow();
+   '<div class="d-section">Conta</div>'+
+   big('♻️','Restaurar backup','Recuperar seus dados de uma cópia anterior',"abrirRestaurar()")+
+   logoutRow();
 }
 function statMini(l,v,bg){return '<div class="d-stat" style="background:var(--'+bg+')"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';}
 function big(e,t,s,act){return '<div class="d-big" onclick="'+act+'"><div class="d-ic">'+e+'</div><div class="d-grow"><div class="d-b">'+t+'</div><div class="d-s">'+s+'</div></div><div style="color:var(--muted)">›</div></div>';}
@@ -599,6 +601,7 @@ const SCREENS={
   p_relatorios:{t:'Relatórios',nav:'prof',f:scrRelatorios},
   p_aulas_dia:{t:'Aulas por dia',back:'p_home',f:scrAulasDia},
   p_ver_aluna:{t:'Ver como aluna',back:'p_home',f:scrVerAluna},
+  p_restaurar:{t:'Restaurar backup',back:'p_home',f:scrRestaurar},
   a_home:{t:function(){return 'Olá, '+curAluna().nome.split(' ')[0]+' 👋';},nav:'aluna',f:scrAlunaHome},
   a_agenda:{t:'Agenda',nav:'aluna',f:scrAgenda},
   a_avisos:{t:'Avisos',back:'a_home',f:scrAlunaAvisos},
@@ -669,6 +672,36 @@ function fazerBackup(){
     db.collection('app').doc(docId).set(copia).catch(function(){});
   }).catch(function(){});}catch(e){}
 }
+var _bkpList=null,_bkpLoading=false;
+function abrirRestaurar(){_bkpList=null;_bkpLoading=false;V.screen='p_restaurar';render();carregarBackups();}
+function carregarBackups(){
+  if(!db||_bkpLoading)return;_bkpLoading=true;_bkpList=null;
+  var dias=['dom','seg','ter','qua','qui','sex','sab'];var res=[],pend=dias.length;
+  dias.forEach(function(dia){
+    db.collection('app').doc('bkp_'+dia).get().then(function(sn){
+      if(sn.exists){var d=sn.data();if(d&&d.turmas)res.push({id:'bkp_'+dia,dia:dia,ts:d._bkpTs||0,alunas:(d.alunas?d.alunas.length:0),turmas:(d.turmas?d.turmas.length:0)});}
+    }).catch(function(){}).then(function(){pend--;if(pend===0){_bkpList=res.sort(function(a,b){return b.ts-a.ts;});_bkpLoading=false;if(V.screen==='p_restaurar')render();}});
+  });
+}
+function scrRestaurar(){
+  if(_bkpList===null){if(!_bkpLoading)carregarBackups();return '<div class="d-s">Procurando seus backups…</div>';}
+  if(!_bkpList.length)return empty('Nenhum backup encontrado. Os backups são criados automaticamente uma vez por dia, quando você abre o app.');
+  var DIAS={dom:'Domingo',seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado'};
+  function fmt(ts){if(!ts)return '';var q=new Date(ts);function p(n){return ('0'+n).slice(-2);}return p(q.getDate())+'/'+p(q.getMonth()+1)+'/'+q.getFullYear()+' às '+p(q.getHours())+':'+p(q.getMinutes());}
+  return '<div class="d-s">Escolha uma cópia para restaurar. Os dados de agora serão substituídos pelos dessa data.</div>'+
+    _bkpList.map(function(b){return '<div class="d-card d-row"><div class="d-grow"><div class="d-b">'+(DIAS[b.dia]||b.dia)+'</div><div class="d-s">'+fmt(b.ts)+' · '+b.alunas+' aluna'+(b.alunas===1?'':'s')+' · '+b.turmas+' turma'+(b.turmas===1?'':'s')+'</div></div><button class="d-cta ghost" style="width:auto;padding:10px 16px" onclick="restaurarBackup(\''+b.id+'\','+b.alunas+')">Restaurar</button></div>';}).join('');
+}
+function restaurarBackup(id,nAl){
+  ask('Restaurar esta cópia com '+nAl+' aluna'+(nAl===1?'':'s')+'? Os dados atuais serão substituídos.',function(){
+    db.collection('app').doc(id).get().then(function(sn){
+      if(!sn.exists){toast('Backup não encontrado.');return;}
+      var d=sn.data();if(!d||!d.turmas){toast('Esse backup está vazio.');return;}
+      delete d._bkpDia;delete d._bkpTs;
+      S=d;_ultAlunas=(S.alunas?S.alunas.length:0);sReady=true;
+      db.collection('app').doc('estado').set(S).then(function(){toast('Dados restaurados! 💚');go('p_home');}).catch(function(){toast('Falha ao restaurar — verifique a internet.');});
+    }).catch(function(){toast('Falha ao ler o backup.');});
+  });
+}
 function boot(){
   try{firebase.initializeApp(FIREBASE_CONFIG);}catch(e){}
   db=firebase.firestore();auth=firebase.auth();
@@ -676,9 +709,9 @@ function boot(){
   db.collection('app').doc('estado').onSnapshot(function(snap){
     var data=snap.exists?snap.data():null;
     if(data&&data.turmas){S=data;sReady=true;_ultAlunas=(S.alunas?S.alunas.length:0);}
-    else if(!snap.exists&&!snap.metadata.hasPendingWrites){S=seed();sReady=true;save();}
+    else if(!snap.exists&&!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){S=seed();sReady=true;save();}
     else{if(!sReady)loading();return;}
-    if(!snap.metadata.hasPendingWrites){var _c1=limparOrfaos();var _c2=repararAgenda();var _c3=dedupeAulas();var _c4=estenderAgenda();if(_c1||_c2||_c3||_c4)save();}
+    if(!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){var _c1=limparOrfaos();var _c2=repararAgenda();var _c3=dedupeAulas();var _c4=estenderAgenda();if(_c1||_c2||_c3||_c4)save();}
     checarNotifs();registrarPush();fazerBackup();
     if(isInputScreen(V.screen))return;
     route();
