@@ -188,7 +188,7 @@ function seed(){
 }
 function gerarTurmasPadrao(){var add=0;turmasPadrao().forEach(function(t){var existe=S.turmas.some(function(x){return x.dia===t.dia&&x.periodo===t.periodo;});if(!existe){t.id=uid();S.turmas.push(t);add++;}});if(add>0){save();render();toast(add+' turma'+(add>1?'s':'')+' criada'+(add>1?'s':'')+' 💗');}else{toast('Todas as turmas padrão já existem.');}}
 function setDiaVenc(delta){var d=(diaVenc()+delta);if(d<1)d=1;if(d>28)d=28;S.config.diaVencimento=d;S.pagamentos.forEach(function(p){if(!p.pagoEm){var al=S.alunas.find(function(x){return x.id===p.alunaId;});if(al&&al.diaVenc)return;var v=D(p.venc);p.venc=new Date(v.getFullYear(),v.getMonth(),d).toISOString();}});save();render();toast('Vencimento padrão: dia '+d);}
-function save(){if(!db){return;}db.collection('app').doc('estado').set(S).catch(function(e){toast('Falha ao salvar — verifique a internet.');});}
+function save(){if(!db||!S){return;}if(!sReady){return;}if(_ultAlunas>0&&(!S.alunas||S.alunas.length<Math.ceil(_ultAlunas/2))){toast('Gravação bloqueada por segurança. Recarregando seus dados…');db.collection('app').doc('estado').get().then(function(sn){var d=sn.exists?sn.data():null;if(d&&d.turmas){S=d;_ultAlunas=(S.alunas?S.alunas.length:0);sReady=true;render();}}).catch(function(){});return;}db.collection('app').doc('estado').set(S).then(function(){_ultAlunas=(S.alunas?S.alunas.length:0);}).catch(function(e){toast('Falha ao salvar — verifique a internet.');});}
 
 function curAluna(){return S.alunas.find(a=>a.id===V.alunaId)||null;}
 function alunaNome(id){const a=S.alunas.find(x=>x.id===id);return a?a.nome:'—';}
@@ -623,7 +623,7 @@ function render(){
   h+=sc.nav?bottomNav(sc.nav):'';
   document.getElementById('app').innerHTML=h;
 }
-var db,auth,authUser=null,sReady=false;
+var db,auth,authUser=null,sReady=false,_ultAlunas=-1;
 function emailOf(){return authUser?((authUser.email||'').toLowerCase()):'';}
 function computeRole(){
   if(!S)return {mode:'anon'};
@@ -674,9 +674,9 @@ function boot(){
   auth.onAuthStateChanged(function(u){authUser=u;route();});
   db.collection('app').doc('estado').onSnapshot(function(snap){
     var data=snap.exists?snap.data():null;
-    if(data&&data.turmas){S=data;sReady=true;}
-    else if(!snap.metadata.hasPendingWrites){S=seed();sReady=true;save();}
-    else{return;}
+    if(data&&data.turmas){S=data;sReady=true;_ultAlunas=(S.alunas?S.alunas.length:0);}
+    else if(!snap.exists&&!snap.metadata.hasPendingWrites){S=seed();sReady=true;save();}
+    else{if(!sReady)loading();return;}
     if(!snap.metadata.hasPendingWrites){var _c1=limparOrfaos();var _c2=repararAgenda();var _c3=dedupeAulas();if(_c1||_c2||_c3)save();}
     checarNotifs();registrarPush();fazerBackup();
     if(isInputScreen(V.screen))return;
