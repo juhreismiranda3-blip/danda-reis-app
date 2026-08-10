@@ -344,7 +344,7 @@ function scrTurmaForm(){
    (t?'<button class="d-cta ghost danger" onclick="delTurma(\''+t.id+'\')">Remover turma</button>':'');
 }
 function scrAlunas(){
-  var head='<button class="d-cta" onclick="newAluna()">+ Nova aluna</button>'+'<button class="d-cta ghost" onclick="importarAlunas()">Importar lista inicial</button>'+'<button class="d-cta ghost" onclick="ask(\'Gerar acesso para TODAS as alunas? E-mail = primeiro nome + costurete@gmail.com e senha costurete.\',gerarAcessos)">Gerar acesso de todas</button>';
+  var head='<button class="d-cta" onclick="newAluna()">+ Nova aluna</button>'+(S.alunas.length?'':'<button class="d-cta ghost" onclick="importarAlunas()">Importar lista inicial</button>')+'<button class="d-cta ghost" onclick="ask(\'Gerar acesso para TODAS as alunas? E-mail = primeiro nome + costurete@gmail.com e senha costurete.\',gerarAcessos)">Gerar acesso de todas</button>';
   if(!S.alunas.length)return head+empty('Nenhuma aluna ainda.');
   function cardAluna(a){return '<div class="d-card d-row" onclick="edAluna(\''+a.id+'\')"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(a.nome)+'</div><div class="d-s">'+a.aulasMes+' aulas/mês'+(a.turmaId2?' · 2 períodos':'')+'</div>'+(a.email?'<div class="d-s" style="color:var(--pinkT)">'+esc(a.email)+'</div>':'')+'</div><div style="color:var(--muted)">›</div></div>';}
   var ts=S.turmas.slice().sort(function(a,b){return (DIAS_SEMANA.indexOf(a.dia)-DIAS_SEMANA.indexOf(b.dia))||(PERIODOS.indexOf(a.periodo)-PERIODOS.indexOf(b.periodo));});
