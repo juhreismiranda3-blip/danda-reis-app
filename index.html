@@ -252,6 +252,7 @@ function alunasNaTurma(tid){return S.alunas.filter(function(a){return a.turmaId=
 function ocupadasReais(tid,iso){return S.aulas.filter(function(a){return a.turmaId===tid&&a.status!=='cancelada'&&sameDay(a.data,iso);}).length;}
 function ofertasManuais(tid,iso){return S.ofertas.filter(function(o){return o.manual&&o.aberta&&o.turmaId===tid&&sameDay(o.data,iso);}).length;}
 function vagaData(tid,iso){return Math.max(0,alunasNaTurma(tid)-ocupadasReais(tid,iso)+ofertasManuais(tid,iso));}
+function vagaVisivel(o,aid){if(!o||!o.aberta||o.origem===aid)return false;if(vagaData(o.turmaId,o.data)<=0)return false;var h=new Date();if(D(o.data)<new Date(h.getFullYear(),h.getMonth(),h.getDate()))return false;if(alunaTemAulaNo(aid,o.data,o.periodo))return false;return true;}
 function ajustarVaga(tid,iso,delta){var t=S.turmas.find(function(x){return x.id===tid;});if(!t)return;if(delta>0){S.ofertas.push({id:uid(),turmaId:tid,data:iso,periodo:t.periodo,hora:t.inicio,origem:'prof',aberta:true,manual:true});save();render();toast('Vaga liberada — as alunas já veem e podem pegar 💗');}else{var ab=S.ofertas.filter(function(o){return o.manual&&o.aberta&&o.turmaId===tid&&sameDay(o.data,iso);});if(ab.length){ab[ab.length-1].aberta=false;save();render();toast('Vaga fechada.');}else{toast('Não há vaga aberta para fechar aqui.');}}}
 function abrirEncaixe(tid,iso){V.screen='p_encaixar';V.tmp={encTid:tid,encIso:iso};render();}
 function scrEncaixar(){var t=S.turmas.find(function(x){return x.id===V.tmp.encTid;});var iso=V.tmp.encIso;if(!t||!iso)return empty('Selecione um dia na presença.');var ocup={};S.aulas.forEach(function(a){if(a.turmaId===t.id&&a.status!=='cancelada'&&sameDay(a.data,iso))ocup[a.alunaId]=1;});var disp=S.alunas.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);});var out='<div class="d-tint"><div class="d-eyebrow">'+esc(t.nome)+'</div><div class="d-s" style="color:var(--pinkT);margin-top:4px">'+cap(dow(iso))+' '+dm(iso)+'</div></div>';out+='<label class="d-card d-row" style="gap:10px;align-items:center;cursor:pointer"><input type="checkbox" id="enc_cobrar" style="width:20px;height:20px"><div><div class="d-b">Cobrar como aula extra</div><div class="d-s">Some '+money(valorExtraCfg())+' na mensalidade dela. Deixe desmarcado para encaixe grátis.</div></div></label>';out+='<div class="d-s" style="margin-top:6px">Toque na aluna para encaixar neste dia.</div>';out+=disp.map(function(a){if(ocup[a.id])return '<div class="d-card d-row" style="opacity:.45"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(a.nome)+'</div><div class="d-s">Já está nesse dia</div></div><span class="pill lilac">na aula</span></div>';return '<div class="d-card d-row" onclick="encaixarAluna(\''+a.id+'\')"><div class="d-ic">👩</div><div class="d-grow"><div class="d-b">'+esc(a.nome)+'</div><div class="d-s">'+esc(turmaLabel(a.turmaId))+'</div></div><div style="color:var(--pink);font-weight:700">＋</div></div>';}).join('');return out;}
@@ -456,7 +457,7 @@ function scrAlunaHome(){
 function scrAgenda(){
   const a=curAluna();const now=new Date();
   const list=S.aulas.filter(x=>x.alunaId===a.id&&x.status==='agendada'&&D(x.data)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((x,y)=>D(x.data)-D(y.data));
-  const ofertas=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
+  const ofertas=S.ofertas.filter(o=>vagaVisivel(o,a.id));
   let h='';
   if(ofertas.length)h+='<div class="banner" onclick="go(\'a_vagas\')">🔔 <span style="flex:1">Abriu '+ofertas.length+' vaga'+(ofertas.length>1?'s':'')+'! Toque para ver.</span> ›</div>';
   h+='<div class="d-section">Próximas aulas</div>';
@@ -514,7 +515,7 @@ function scrRecibo(){
    '</div>';
 }
 function scrVagas(){
-  const a=curAluna();const list=S.ofertas.filter(o=>o.aberta&&o.origem!==a.id&&vagaData(o.turmaId,o.data)>0);
+  const a=curAluna();const list=S.ofertas.filter(o=>vagaVisivel(o,a.id));
   let h=(a.reposicao||0)>0
     ? '<div class="warn" style="background:var(--okbg);color:var(--okt)">A primeira que aceitar leva. Você tem reposição — pegar esta vaga será <b>sem custo</b>.</div>'
     : '<div class="warn">A primeira que aceitar leva. Conta como aula extra: '+money(valorExtraCfg())+' somados à mensalidade.</div>';
