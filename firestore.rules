@@ -1,88 +1,29 @@
 rules_version = '2';
 
+// Regras do app Danda Reis.
+// O app guarda todo o estado em documentos da coleção "app"
+// (app/estado e os backups app/bkp_*). O aplicativo precisa ler o
+// estado antes do login (para conseguir mostrar a tela de entrada),
+// por isso a leitura de "app" fica liberada; a gravação exige estar
+// logada. "pushTokens" guarda os tokens de notificação de cada
+// dispositivo (gravados após o login).
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function estaLogado() {
-      return request.auth != null;
+    match /app/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
 
-    function ehProfessora() {
-      return estaLogado() &&
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tipo == 'professora';
+    match /pushTokens/{token} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
-    function ehDonoDoDocumento(alunaId) {
-      return estaLogado() && request.auth.uid == alunaId;
-    }
-
-    // Cada aluna só lê o próprio perfil; professora lê/edita todos.
-    // A própria pessoa pode atualizar apenas o seu token de notificação
-    // (fcmToken) — necessário para receber as notificações push.
-    match /usuarios/{usuarioId} {
-      allow read: if ehDonoDoDocumento(usuarioId) || ehProfessora();
-      allow write: if ehProfessora();
-      allow update: if ehDonoDoDocumento(usuarioId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']);
-    }
-
-    // Turmas: leitura liberada para logados (necessário para checar
-    // disponibilidade), escrita só para a professora.
-    match /turmas/{turmaId} {
-      allow read: if estaLogado();
-      allow write: if ehProfessora();
-    }
-
-    // Aulas: aluna só vê as próprias; professora vê todas.
-    // Escrita direta do cliente é restrita — a maior parte das mutações
-    // relevantes (remarcação, presença) deve passar pelas Cloud Functions
-    // para garantir a integridade da máquina de estados.
-    match /aulas/{aulaId} {
-      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
-      allow write: if ehProfessora();
-    }
-
-    match /remarcacoes_pendentes/{solicitacaoId} {
-      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
-      allow create: if estaLogado() && request.resource.data.alunaId == request.auth.uid;
-      allow update: if ehProfessora();
-    }
-
-    // Contador de ocupação por turma+dia (fonte de verdade da lotação, usado
-    // pela reserva atômica). Leitura liberada para logados (checar vagas);
-    // a escrita acompanha a criação de aulas — em produção, via Cloud Function.
-    match /ocupacao/{ocupacaoId} {
-      allow read: if estaLogado();
-      allow write: if ehProfessora();
-    }
-
-    // Vagas liberadas (aluna recusou) ofertadas às demais. Todas as logadas
-    // veem; quem liberou cria a oferta; aceitar é um update (em produção,
-    // via Cloud Function para garantir 1 vaga = 1 aceite).
-    match /vagas_ofertadas/{ofertaId} {
-      allow read: if estaLogado();
-      allow create: if estaLogado() && request.resource.data.origemAlunaId == request.auth.uid;
-      allow update: if estaLogado();
-    }
-
-    match /pacotes/{pacoteId} {
-      allow read: if estaLogado();
-      allow write: if ehProfessora();
-    }
-
-    match /pagamentos/{pagamentoId} {
-      allow read: if ehProfessora() || (estaLogado() && resource.data.alunaId == request.auth.uid);
-      allow write: if ehProfessora();
-    }
-
-    match /avisos/{avisoId} {
-      allow read: if estaLogado();
-      allow write: if ehProfessora();
-    }
-
-    match /notificacoes/{notificacaoId} {
-      allow read: if estaLogado() && resource.data.alunaId == request.auth.uid;
-      allow write: if false; // só Cloud Functions escrevem aqui
+    // Qualquer outra coleção fica bloqueada.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

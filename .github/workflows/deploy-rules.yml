@@ -1,0 +1,20 @@
+name: Publicar regras do Firestore
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.github/workflows/deploy-rules.yml'
+  workflow_dispatch:
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publicar regras no Firebase
+        uses: w9jds/firebase-action@v13.20.2
+        with:
+          args: deploy --only firestore:rules --project danda-reis
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
