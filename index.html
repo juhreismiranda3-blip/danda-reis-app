@@ -722,11 +722,10 @@ function restaurarBackup(id,nAl){
     }).catch(function(){toast('Falha ao ler o backup.');});
   });
 }
-function boot(){
-  try{firebase.initializeApp(FIREBASE_CONFIG);}catch(e){}
-  db=firebase.firestore();auth=firebase.auth();
-  auth.onAuthStateChanged(function(u){authUser=u;route();});
+var _reErr;
+function ouvirEstado(){
   db.collection('app').doc('estado').onSnapshot(function(snap){
+    clearTimeout(_reErr);
     var data=snap.exists?snap.data():null;
     if(data&&data.turmas){S=data;sReady=true;_ultAlunas=(S.alunas?S.alunas.length:0);}
     else if(!snap.exists&&!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){S=seed();sReady=true;save();}
@@ -735,7 +734,17 @@ function boot(){
     checarNotifs();registrarPush();fazerBackup();
     if(isInputScreen(V.screen))return;
     route();
-  },function(err){var el=document.getElementById('app');if(el)el.innerHTML='<div class="welcome"><div class="w-logo">⚠️</div><div class="w-tag" style="margin-top:16px">Não consegui abrir o banco de dados. Confira a internet e recarregue a página.</div></div>';});
+  },function(err){
+    var el=document.getElementById('app');
+    if(el&&!sReady)el.innerHTML='<div class="welcome"><div class="w-logo">⚠️</div><div class="w-tag" style="margin-top:16px">Não consegui abrir o banco de dados. Vou tentar reconectar sozinha…</div><div class="w-btns" style="margin-top:18px"><button class="d-cta" onclick="location.reload()">Recarregar agora</button></div></div>';
+    clearTimeout(_reErr);_reErr=setTimeout(ouvirEstado,5000);
+  });
+}
+function boot(){
+  try{firebase.initializeApp(FIREBASE_CONFIG);}catch(e){}
+  db=firebase.firestore();auth=firebase.auth();
+  auth.onAuthStateChanged(function(u){authUser=u;route();});
+  ouvirEstado();
 }
 window.onload=function(){V={screen:'inicio',tmp:{},loginRole:null,signup:false};loading();boot();};
 </script>
