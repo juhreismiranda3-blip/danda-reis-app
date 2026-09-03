@@ -177,6 +177,25 @@ let S,V;
 function gerarAulas(a){[a.turmaId,a.turmaId2].forEach(function(tid){if(!tid)return;var t=S.turmas.find(function(x){return x.id===tid;});if(!t)return;for(var i=0;i<8;i++){var d=nextDate(DOW[t.dia],i);S.aulas.push({id:uid(),alunaId:a.id,turmaId:t.id,data:d.toISOString(),periodo:t.periodo,hora:t.inicio,status:'agendada',confirmacao:'pendente',origem:'pacote'});}});}
 function diaVenc(){return (S&&S.config&&S.config.diaVencimento)||10;}
 function novaMensalidade(alunaId,base){const now=new Date();var _al=S.alunas.find(function(x){return x.id===alunaId;});var d=(_al&&_al.diaVenc)||diaVenc();let venc=new Date(now.getFullYear(),now.getMonth(),d);if(venc<now)venc=new Date(now.getFullYear(),now.getMonth()+1,d);return {id:uid(),alunaId,base:base,extras:0,qtdExtras:0,venc:venc.toISOString(),pagoEm:null,desc:'Mensalidade de '+mesNome(venc)};}
+function mesMens(iso){var d=D(iso);return d.getFullYear()+'-'+d.getMonth();}
+// Vira o mês: garante a mensalidade do mês atual para cada aluna, mesmo
+// que a do mês anterior esteja em aberto. Só a professora gera (evita que
+// o app da aluna crie cobranças). Roda sozinho quando o app abre.
+function virarMeses(){
+  if(!S||!S.alunas)return false;
+  var pe=((S.config&&S.config.professoraEmail)||'').toLowerCase();
+  if(!pe||emailOf()!==pe)return false;
+  var hoje=new Date();var curKey=hoje.getFullYear()+'-'+hoje.getMonth();var mudou=false;
+  S.alunas.forEach(function(a){
+    var tem=S.pagamentos.some(function(p){return p.alunaId===a.id&&(p.base||0)>0&&mesMens(p.venc)===curKey;});
+    if(!tem){
+      var d=(a.diaVenc)||diaVenc();var venc=new Date(hoje.getFullYear(),hoje.getMonth(),d);
+      S.pagamentos.push({id:uid(),alunaId:a.id,base:valorMensal(),extras:0,qtdExtras:0,venc:venc.toISOString(),pagoEm:null,desc:'Mensalidade de '+mesNome(venc)});
+      mudou=true;
+    }
+  });
+  return mudou;
+}
 
 var DIAS_SEMANA=['segunda','terca','quarta','quinta'];
 var PERIODOS=['manha','tarde','noite'];
@@ -730,7 +749,7 @@ function ouvirEstado(){
     if(data&&data.turmas){S=data;sReady=true;_ultAlunas=(S.alunas?S.alunas.length:0);}
     else if(!snap.exists&&!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){S=seed();sReady=true;save();}
     else{if(!sReady)loading();return;}
-    if(!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){var _c1=limparOrfaos();var _c2=repararAgenda();var _c3=dedupeAulas();var _c4=estenderAgenda();if(_c1||_c2||_c3||_c4)save();}
+    if(!snap.metadata.hasPendingWrites&&!snap.metadata.fromCache){var _c1=limparOrfaos();var _c2=repararAgenda();var _c3=dedupeAulas();var _c4=estenderAgenda();var _c5=virarMeses();if(_c1||_c2||_c3||_c4||_c5)save();}
     checarNotifs();registrarPush();fazerBackup();
     if(isInputScreen(V.screen))return;
     route();
